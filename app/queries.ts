@@ -33,6 +33,7 @@ import { areaKm2, distanceMeters, normalizeBbox, streetKey } from "@/lib/geo";
 import {
   CLUSTER_RADIUS_METERS,
   FRANCHISE_MIN_ESTABLISHMENTS,
+  MAX_CUMULATIVE_AREA_KM2,
   MAX_PROXIMITY_ANCHORS,
   MAX_TARGETS_FOR_STATS,
   MAX_TARGETS_IN_VIEW,
@@ -1112,6 +1113,25 @@ export async function listZones(owner: Account, limit = 20): Promise<ZoneRow[]> 
   }
 
   return out;
+}
+
+/**
+ * Sums every zone's area for an owner (soon: organisation). Gated behind
+ * MOLLIE_API_KEY: self-hosted never enforces the cumulative ceiling, so the
+ * value is only fetched when billing is active.
+ */
+export async function getCumulativeAreaKm2(owner: Account): Promise<{
+  km2: number;
+  maxKm2: number;
+}> {
+  const rows = await db
+    .select({ bbox: zones.bbox })
+    .from(zones)
+    .where(eq(zones.ownerId, owner.id));
+
+  const km2 = rows.reduce((sum, row) => sum + areaKm2(row.bbox as Bbox), 0);
+
+  return { km2, maxKm2: MAX_CUMULATIVE_AREA_KM2 };
 }
 
 // Pages calling these reads must set `export const dynamic = "force-dynamic"`,

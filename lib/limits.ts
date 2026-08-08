@@ -5,6 +5,10 @@
 // past this the recherche-entreprises API silently truncates at 10 000 results.
 export const MAX_ZONE_AREA_KM2 = 12;
 
+// SaaS monthly quota: the cumulative surface an organisation may survey. Gated by
+// MOLLIE_API_KEY — self-hosted instances never enforce it.
+export const MAX_CUMULATIVE_AREA_KM2 = 50;
+
 export const HARVEST_PAGES_PER_CALL = 25;
 
 export const MAX_TARGETS_PER_HARVEST = 1_500;

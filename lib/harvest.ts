@@ -12,6 +12,7 @@ import { db, events, targets, zones, type NewTarget, type Zone } from "@/lib/db"
 import { areaKm2, normalizeBbox, pointInPolygon } from "@/lib/geo";
 import {
   HARVEST_PAGES_PER_CALL,
+  MAX_CUMULATIVE_AREA_KM2,
   MAX_TARGETS_PER_HARVEST,
   MAX_ZONE_AREA_KM2,
   UPSERT_CHUNK,
@@ -218,6 +219,26 @@ export async function openZone(
       reason: "surface",
       message: `Sector too large: ${area.toFixed(1)} km² for ${MAX_ZONE_AREA_KM2} km² at most. Draw a neighbourhood rather than a town.`,
     };
+  }
+
+  if (process.env.MOLLIE_API_KEY) {
+    const existing = await db
+      .select({ bbox: zones.bbox })
+      .from(zones)
+      .where(eq(zones.ownerId, request.ownerId));
+
+    const cumulative = existing.reduce(
+      (sum, row) => sum + areaKm2(row.bbox as Bbox),
+      0,
+    );
+
+    if (cumulative + area > MAX_CUMULATIVE_AREA_KM2) {
+      const total = cumulative + area;
+      return {
+        reason: "surface",
+        message: `Cumulative limit reached: ${cumulative.toFixed(1)} km² already surveyed this month. Adding ${area.toFixed(1)} km² would reach ${total.toFixed(1)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²).`,
+      };
+    }
   }
 
   const nafCodes =

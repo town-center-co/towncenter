@@ -64,6 +64,7 @@ import {
   CLUSTER_RADIUS_PX,
   CLUSTER_ZOOM_MAX,
   MAP_LAYERS,
+  MAX_CUMULATIVE_AREA_KM2,
   MAX_ZONE_AREA_KM2,
   PRICE_ZOOM_MIN,
   PULSE_GHOST_MS,
@@ -727,6 +728,8 @@ export type TerritoryMapProps = {
   /** Full-site price plus a year of hosting: the reference a dot's size is measured against. */
   standardDealCents: number;
   detail: TargetDetail | null;
+  /** Cumulative area already surveyed this month. null = self-hosted, no limit. */
+  cumulativeAreaKm2: { km2: number; maxKm2: number } | null;
   /** The queryable activities, with their French NAF labels. */
   naf: readonly NafOption[];
   defaultNaf: readonly string[];
@@ -749,6 +752,7 @@ export function TerritoryMap({
   stats,
   standardDealCents,
   detail,
+  cumulativeAreaKm2,
   naf,
   defaultNaf,
   fichesParPage,
@@ -887,10 +891,6 @@ export function TerritoryMap({
     const node = badge.current;
     if (!node) return;
 
-    // No attribute of this node is declared in JSX. React reapplies JSX
-    // attributes on every render, and the parent renders many times a second
-    // while drawing, which made the badge flicker and then stay hidden.
-    // Visibility rides on a `data-active` the JSX never mentions.
     if (!bbox) {
       node.dataset.active = "no";
       return;
@@ -898,13 +898,21 @@ export function TerritoryMap({
 
     const area = areaKm2(bbox);
     const tooLarge = area > MAX_ZONE_AREA_KM2;
+    const overCumulative =
+      cumulativeAreaKm2 !== null && area + cumulativeAreaKm2.km2 > MAX_CUMULATIVE_AREA_KM2;
+    const refused = tooLarge || overCumulative;
     node.dataset.active = "yes";
     node.style.transform = `translate(${Math.round(x) + 16}px, ${Math.round(y) + 16}px)`;
-    node.dataset.refusal = tooLarge ? "yes" : "no";
-    node.textContent = tooLarge
-      ? `${formatNumber(area, 2)} km² — beyond ${MAX_ZONE_AREA_KM2} km², the survey is refused`
-      : `${formatNumber(area, 2)} km²`;
-  }, []);
+    node.dataset.refusal = refused ? "yes" : "no";
+    if (tooLarge) {
+      node.textContent = `${formatNumber(area, 2)} km² — beyond ${MAX_ZONE_AREA_KM2} km², the survey is refused`;
+    } else if (overCumulative) {
+      const total = area + cumulativeAreaKm2.km2;
+      node.textContent = `${formatNumber(area, 2)} km² — total would reach ${formatNumber(total, 2)} km² (${MAX_CUMULATIVE_AREA_KM2} km² limit)`;
+    } else {
+      node.textContent = `${formatNumber(area, 2)} km²`;
+    }
+  }, [cumulativeAreaKm2]);
 
   const cancelDraw = useCallback(() => {
     traceRef.current = null;
@@ -1120,7 +1128,18 @@ export function TerritoryMap({
         // the API saturates at 10 000 results without saying so.
         if (area > MAX_ZONE_AREA_KM2) {
           setDrawRefusal(
-            `${formatNumber(area, 2)} km²: beyond ${MAX_ZONE_AREA_KM2} km², the survey would return an incomplete sector without saying so. Cut it smaller.`,
+            `Sector too large: ${formatNumber(area, 2)} km². The limit is ${MAX_ZONE_AREA_KM2} km² per sector. Cut it smaller.`,
+          );
+          return;
+        }
+
+        if (
+          cumulativeAreaKm2 !== null &&
+          area + cumulativeAreaKm2.km2 > MAX_CUMULATIVE_AREA_KM2
+        ) {
+          const total = area + cumulativeAreaKm2.km2;
+          setDrawRefusal(
+            `Cumulative limit reached: you have surveyed ${formatNumber(cumulativeAreaKm2.km2, 2)} km² this month. Adding ${formatNumber(area, 2)} km² would reach ${formatNumber(total, 2)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²).`,
           );
           return;
         }
@@ -1799,7 +1818,9 @@ export function TerritoryMap({
                  text continues on the next line, turning "12 km²" into
                  "12km²" with no warning. */
               <p className="t-body-s map__hint">
-                {`Drag to draw a rectangle. ${MAX_ZONE_AREA_KM2} km² at most, or the API saturates its 10 000 results and returns an incomplete sector without saying so.`}
+                {cumulativeAreaKm2 !== null
+                  ? `Drag to draw a rectangle. ${MAX_ZONE_AREA_KM2} km² per sector, ${MAX_CUMULATIVE_AREA_KM2} km² total per month (${formatNumber(cumulativeAreaKm2.km2, 1)} km² already surveyed).`
+                  : `Drag to draw a rectangle. ${MAX_ZONE_AREA_KM2} km² at most, or the API saturates its 10 000 results and returns an incomplete sector without saying so.`}
               </p>
             ) : null}
 

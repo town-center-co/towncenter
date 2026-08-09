@@ -470,6 +470,7 @@ export type OnboardingFacts = {
   placesKeyMask: string | null;
   hasCustomGrid: boolean;
   sectorCount: number;
+  isSaaS: boolean;
 };
 
 export async function getOnboardingFacts(
@@ -493,6 +494,7 @@ export async function getOnboardingFacts(
     placesKeyMask: key ? maskKey(key) : null,
     hasCustomGrid,
     sectorCount,
+    isSaaS: process.env.NEXT_PUBLIC_SAAS === "true",
   };
 }
 

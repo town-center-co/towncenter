@@ -6,8 +6,9 @@
 
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
+import { getQuotaPeriodStart } from "@/lib/billing/subscriptions";
 import { db, events, targets, zones, type NewTarget, type Zone } from "@/lib/db";
 import { areaKm2, normalizeBbox, pointInPolygon } from "@/lib/geo";
 import {
@@ -222,10 +223,19 @@ export async function openZone(
   }
 
   if (process.env.MOLLIE_API_KEY) {
+    const periodStart = await getQuotaPeriodStart(request.ownerId);
+
     const existing = await db
       .select({ bbox: zones.bbox })
       .from(zones)
-      .where(eq(zones.ownerId, request.ownerId));
+      .where(
+        periodStart
+          ? and(
+              eq(zones.ownerId, request.ownerId),
+              gte(zones.startedAt, periodStart),
+            )
+          : eq(zones.ownerId, request.ownerId),
+      );
 
     const cumulative = existing.reduce(
       (sum, row) => sum + areaKm2(row.bbox as Bbox),
@@ -236,7 +246,7 @@ export async function openZone(
       const total = cumulative + area;
       return {
         reason: "surface",
-        message: `Cumulative limit reached: ${cumulative.toFixed(1)} km² already surveyed this month. Adding ${area.toFixed(1)} km² would reach ${total.toFixed(1)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²).`,
+        message: `Cumulative limit reached: ${cumulative.toFixed(1)} km² already surveyed this period. Adding ${area.toFixed(1)} km² would reach ${total.toFixed(1)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²). Manage your plan on the Billing screen.`,
       };
     }
   }

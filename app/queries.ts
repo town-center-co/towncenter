@@ -19,6 +19,12 @@ import "server-only";
 import { and, desc, eq, gte, inArray, lte, ne, sql, type SQL } from "drizzle-orm";
 
 import type { Account } from "@/lib/accounts";
+import { mollieEnabled, mollieTestMode } from "@/lib/billing/mollie";
+import {
+  getQuotaPeriodStart,
+  getSubscriptionRow,
+  isSubscriptionCurrent,
+} from "@/lib/billing/subscriptions";
 import {
   db,
   events,
@@ -58,6 +64,7 @@ import {
   type ProximityFact,
   type ScoringFacts,
   type SiteAuditFacts,
+  type SubscriptionStatus,
   type TargetState,
   type ZoneStatus,
 } from "@/lib/types";
@@ -1118,22 +1125,70 @@ export async function listZones(owner: Account, limit = 20): Promise<ZoneRow[]> 
 }
 
 /**
- * Sums every zone's area for an owner (soon: organisation). Gated behind
+ * Sums the zones opened in the current quota window. Gated behind
  * MOLLIE_API_KEY: self-hosted never enforces the cumulative ceiling, so the
- * value is only fetched when billing is active.
+ * value is only fetched when billing is active. A current subscription counts
+ * from its paid period; an unpaid account counts everything it ever opened.
  */
 export async function getCumulativeAreaKm2(owner: Account): Promise<{
   km2: number;
   maxKm2: number;
 }> {
+  const periodStart = await getQuotaPeriodStart(owner.id);
+
   const rows = await db
     .select({ bbox: zones.bbox })
     .from(zones)
-    .where(eq(zones.ownerId, owner.id));
+    .where(
+      periodStart
+        ? and(eq(zones.ownerId, owner.id), gte(zones.startedAt, periodStart))
+        : eq(zones.ownerId, owner.id),
+    );
 
   const km2 = rows.reduce((sum, row) => sum + areaKm2(row.bbox as Bbox), 0);
 
   return { km2, maxKm2: MAX_CUMULATIVE_AREA_KM2 };
+}
+
+export type BillingFacts = {
+  enabled: boolean;
+  testMode: boolean;
+  /** "none" when the account never went near billing. */
+  status: SubscriptionStatus | "none";
+  /** Paid through now — `canceled` stays current until the period runs out. */
+  current: boolean;
+  periodEndIso: string | null;
+  usedKm2: number;
+  maxKm2: number;
+};
+
+export async function getBillingFacts(owner: Account): Promise<BillingFacts> {
+  if (!mollieEnabled()) {
+    return {
+      enabled: false,
+      testMode: false,
+      status: "none",
+      current: false,
+      periodEndIso: null,
+      usedKm2: 0,
+      maxKm2: MAX_CUMULATIVE_AREA_KM2,
+    };
+  }
+
+  const [row, usage] = await Promise.all([
+    getSubscriptionRow(owner.id),
+    getCumulativeAreaKm2(owner),
+  ]);
+
+  return {
+    enabled: true,
+    testMode: mollieTestMode(),
+    status: row?.status ?? "none",
+    current: isSubscriptionCurrent(row),
+    periodEndIso: row?.currentPeriodEnd?.toISOString() ?? null,
+    usedKm2: usage.km2,
+    maxKm2: usage.maxKm2,
+  };
 }
 
 // Pages calling these reads must set `export const dynamic = "force-dynamic"`,

@@ -22,6 +22,13 @@
       "when": 1786092394522,
       "tag": "0002_exotic_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786309529038,
+      "tag": "0003_stale_unicorn",
+      "breakpoints": true
     }
   ]
 }

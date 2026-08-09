@@ -19,6 +19,7 @@ import {
 
 import {
   EVENT_KINDS,
+  SUBSCRIPTION_STATUSES,
   TARGET_STATES,
   TARGET_STATE_RANK,
   USER_ROLES,
@@ -28,6 +29,7 @@ import {
   type EventKind,
   type PriceGrid,
   type SiteAuditFacts,
+  type SubscriptionStatus,
   type TargetState,
   type UserRole,
   type ZoneStatus,
@@ -38,11 +40,13 @@ import {
 
 export {
   EVENT_KINDS,
+  SUBSCRIPTION_STATUSES,
   TARGET_STATES,
   TARGET_STATE_RANK,
   USER_ROLES,
   ZONE_STATUSES,
   type EventKind,
+  type SubscriptionStatus,
   type TargetState,
   type UserRole,
   type ZoneStatus,
@@ -298,6 +302,35 @@ export const priceGrids = pgTable("price_grids", {
     .defaultNow(),
 });
 
+// One row per account, like `price_grids`: a missing row means "never went near
+// billing". Only written by /billing actions and the Mollie webhook, and only
+// meaningful when MOLLIE_API_KEY is set — self-hosted instances never read it.
+export const subscriptions = pgTable("subscriptions", {
+  ownerId: text("owner_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+
+  mollieCustomerId: text("mollie_customer_id"),
+  mollieSubscriptionId: text("mollie_subscription_id"),
+
+  planId: text("plan_id").notNull().default("pro"),
+  status: text("status", { enum: SUBSCRIPTION_STATUSES })
+    .notNull()
+    .default("pending"),
+
+  // The paid month. Quota windows start here while the subscription is active;
+  // past `currentPeriodEnd` the account falls back to the unpaid ceiling.
+  currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // Like `price_grids`: one row per account, a missing row plays on the environment's key.
 export const accountSettings = pgTable("account_settings", {
   ownerId: text("owner_id")
@@ -323,3 +356,5 @@ export type PriceGridRow = typeof priceGrids.$inferSelect;
 export type NewPriceGridRow = typeof priceGrids.$inferInsert;
 export type LedgerEvent = typeof events.$inferSelect;
 export type NewLedgerEvent = typeof events.$inferInsert;
+export type SubscriptionRow = typeof subscriptions.$inferSelect;
+export type NewSubscriptionRow = typeof subscriptions.$inferInsert;

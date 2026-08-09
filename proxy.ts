@@ -8,8 +8,13 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 const LOGIN_PATH = "/login";
 
 // this runs on the Edge runtime: nothing touching the database can be imported
-// here, so `/signup` guards itself and decides on its own side.
-const PUBLIC_ROUTES = new Set<string>([LOGIN_PATH, "/signup"]);
+// here, so `/signup` guards itself and decides on its own side. The Mollie
+// webhook carries no session; the route authenticates by fetching the id back.
+const PUBLIC_ROUTES = new Set<string>([
+  LOGIN_PATH,
+  "/signup",
+  "/api/mollie/webhook",
+]);
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;

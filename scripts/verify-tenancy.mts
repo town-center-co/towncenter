@@ -14,6 +14,7 @@
 import { eq, sql } from "drizzle-orm";
 
 import {
+  getBillingFacts,
   getOnboardingFacts,
   getBankedTotalCents,
   getPriceGrid,
@@ -33,6 +34,7 @@ import {
   db,
   events,
   priceGrids,
+  subscriptions,
   targets,
   users,
   zones,
@@ -404,6 +406,49 @@ async function main() {
     );
   }
 
+  // Subscriptions: one row per account, read only through getBillingFacts.
+
+  {
+    // The key gates the read; a bench value turns it on WITHOUT any Mollie
+    // call — getBillingFacts only touches the database.
+    const savedKey = process.env.MOLLIE_API_KEY;
+    process.env.MOLLIE_API_KEY = "test_bench";
+
+    const periodStart = new Date(Date.now() - 24 * 3600 * 1000);
+    const periodEnd = new Date(Date.now() + 27 * 24 * 3600 * 1000);
+    await db
+      .insert(subscriptions)
+      .values({
+        ownerId: bob.id,
+        mollieCustomerId: "cst_bench_bob",
+        mollieSubscriptionId: "sub_bench_bob",
+        status: "active",
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+      })
+      .onConflictDoUpdate({
+        target: subscriptions.ownerId,
+        set: { status: "active" },
+      });
+
+    const bobBilling = await getBillingFacts(bob);
+    const aliceBilling = await getBillingFacts(alice);
+
+    check(
+      "the subscription saved by an account is the one it reads back",
+      bobBilling.status === "active" && bobBilling.current,
+      `bob status ${bobBilling.status}`,
+    );
+    check(
+      "an account with no subscription does NOT pick up another's",
+      aliceBilling.status === "none" && !aliceBilling.current,
+      `alice status ${aliceBilling.status}`,
+    );
+
+    if (savedKey === undefined) delete process.env.MOLLIE_API_KEY;
+    else process.env.MOLLIE_API_KEY = savedKey;
+  }
+
   // The cascade: deleting an account takes its territory with it.
 
   await db.delete(users).where(eq(users.id, bob.id));
@@ -420,12 +465,17 @@ async function main() {
     .select({ total: sql<number>`count(*)` })
     .from(zones)
     .where(eq(zones.ownerId, bob.id));
+  const [remainingSubscriptions] = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(subscriptions)
+    .where(eq(subscriptions.ownerId, bob.id));
 
   check(
-    "deleting an account takes targets, sectors and events",
+    "deleting an account takes targets, sectors, events and subscription",
     Number(remainingTargets?.total) === 0 &&
       Number(remainingEvents?.total) === 0 &&
-      Number(remainingSectors?.total) === 0,
+      Number(remainingSectors?.total) === 0 &&
+      Number(remainingSubscriptions?.total) === 0,
     "Postgres cascade, no pragma",
   );
 

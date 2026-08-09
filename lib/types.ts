@@ -265,6 +265,17 @@ export type ZoneStatus = (typeof ZONE_STATUSES)[number];
 export const USER_ROLES = ["owner", "member"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+// Mirrors the Mollie subscription lifecycle; "pending" also covers a first
+// payment whose checkout was never completed. A missing row means "none".
+export const SUBSCRIPTION_STATUSES = [
+  "pending",
+  "active",
+  "canceled",
+  "suspended",
+  "completed",
+] as const;
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+
 export const EVENT_KINDS = [
   "survey",
   "study",

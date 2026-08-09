@@ -82,7 +82,7 @@ export default async function OnboardingPage(props: PageProps<"/onboarding">) {
               ) : step === "grid" ? (
                 <GridStep facts={facts} />
               ) : step === "upgrade" ? (
-                <UpgradeStep facts={facts} />
+                <UpgradeStep />
               ) : (
                 <SectorStep facts={facts} />
               )}
@@ -253,7 +253,7 @@ function GridStep({ facts }: { facts: OnboardingFacts }) {
   );
 }
 
-function UpgradeStep({ facts }: { facts: OnboardingFacts }) {
+function UpgradeStep() {
   return (
     <>
       <Badge asChild><h2>Plan</h2></Badge>

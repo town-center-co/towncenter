@@ -129,6 +129,13 @@
   text-underline-offset: 3px;
 }
 
+/* The escape hatch under the password field, quieter than the field labels. */
+.forgot {
+  margin: 6px 0 0;
+  font-size: 13px;
+  text-align: right;
+}
+
 /* The alert. The system has two states only — success and failure — so there is
    no third tone here. */
 

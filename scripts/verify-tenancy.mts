@@ -33,6 +33,7 @@ import {
   accountSettings,
   db,
   events,
+  passwordResetTokens,
   priceGrids,
   subscriptions,
   targets,
@@ -451,6 +452,14 @@ async function main() {
 
   // The cascade: deleting an account takes its territory with it.
 
+  // A pending reset token must not survive its account either: an orphaned hash
+  // would let a deleted account's email finish a reset onto a recycled id.
+  await db.insert(passwordResetTokens).values({
+    userId: bob.id,
+    tokenHash: "bench-hash-bob",
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+  });
+
   await db.delete(users).where(eq(users.id, bob.id));
 
   const [remainingTargets] = await db
@@ -469,13 +478,18 @@ async function main() {
     .select({ total: sql<number>`count(*)` })
     .from(subscriptions)
     .where(eq(subscriptions.ownerId, bob.id));
+  const [remainingResetTokens] = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(passwordResetTokens)
+    .where(eq(passwordResetTokens.userId, bob.id));
 
   check(
-    "deleting an account takes targets, sectors, events and subscription",
+    "deleting an account takes targets, sectors, events, subscription and reset tokens",
     Number(remainingTargets?.total) === 0 &&
       Number(remainingEvents?.total) === 0 &&
       Number(remainingSectors?.total) === 0 &&
-      Number(remainingSubscriptions?.total) === 0,
+      Number(remainingSubscriptions?.total) === 0 &&
+      Number(remainingResetTokens?.total) === 0,
     "Postgres cascade, no pragma",
   );
 

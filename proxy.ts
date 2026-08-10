@@ -13,6 +13,8 @@ const LOGIN_PATH = "/login";
 const PUBLIC_ROUTES = new Set<string>([
   LOGIN_PATH,
   "/signup",
+  "/forgot-password",
+  "/reset-password",
   "/api/mollie/webhook",
 ]);
 

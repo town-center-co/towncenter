@@ -80,6 +80,13 @@ export const users = pgTable(
 
     /** Set once the account has been through `/onboarding`; null means still owed the setup. */
     onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
+
+    // Sessions signed before this instant are dead. Set on password reset and
+    // checked in `getUser()` — never in `proxy.ts`, which has no database and
+    // only proves the cookie's signature.
+    sessionsInvalidatedAt: timestamp("sessions_invalidated_at", {
+      withTimezone: true,
+    }),
   },
   (table) => [
     /** The only guard against two simultaneous signups on the same address. */
@@ -331,6 +338,39 @@ export const subscriptions = pgTable("subscriptions", {
     .defaultNow(),
 });
 
+// Single-use password-reset tokens. Only the SHA-256 of the token is stored: a
+// database dump must not let anyone finish a reset. Rows are deleted on use and
+// expired ones are purged opportunistically on each new request — no cron here.
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /** SHA-256 of the raw token, base64url. The raw token only exists in the email. */
+    tokenHash: text("token_hash").notNull(),
+
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("password_reset_tokens_hash_key").on(table.tokenHash),
+    /** The hourly request cap counts on (user_id, created_at). */
+    index("password_reset_tokens_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  ],
+);
+
 // Like `price_grids`: one row per account, a missing row plays on the environment's key.
 export const accountSettings = pgTable("account_settings", {
   ownerId: text("owner_id")
@@ -358,3 +398,4 @@ export type LedgerEvent = typeof events.$inferSelect;
 export type NewLedgerEvent = typeof events.$inferInsert;
 export type SubscriptionRow = typeof subscriptions.$inferSelect;
 export type NewSubscriptionRow = typeof subscriptions.$inferInsert;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;

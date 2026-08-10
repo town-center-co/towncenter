@@ -29,6 +29,13 @@
       "when": 1786309529038,
       "tag": "0003_stale_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786359149760,
+      "tag": "0004_wise_zaladane",
+      "breakpoints": true
     }
   ]
 }

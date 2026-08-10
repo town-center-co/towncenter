@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -24,7 +25,9 @@ export function SignIn() {
     signInAction,
     INITIAL_SIGNIN_STATE,
   );
-  const next = useSearchParams().get("next") ?? "";
+  const params = useSearchParams();
+  const next = params.get("next") ?? "";
+  const justReset = params.get("reset") === "1";
   const [visible, setVisible] = useState(false);
 
   return (
@@ -34,6 +37,12 @@ export function SignIn() {
       {state.error ? (
         <p className={styles.alert} role="alert">
           {state.error}
+        </p>
+      ) : null}
+
+      {justReset && !state.error ? (
+        <p className={styles.notice} role="status">
+          Password changed. Sign in with the new one.
         </p>
       ) : null}
 
@@ -74,6 +83,11 @@ export function SignIn() {
               {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
             </InputGroupButton>
           </InputGroup>
+          <p className={styles.forgot}>
+            <Link href="/forgot-password" className={styles.link}>
+              Forgot password?
+            </Link>
+          </p>
         </Field>
       </div>
 

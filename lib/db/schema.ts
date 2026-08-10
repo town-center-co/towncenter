@@ -330,6 +330,14 @@ export const subscriptions = pgTable("subscriptions", {
   currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
 
+  // The card-backed trial. Set when the €0 mandate payment is confirmed;
+  // non-null means the account's only trial is consumed. The reminder flag
+  // keeps the D-3 email idempotent across `scripts/trial-reminder.mts` runs.
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  trialReminderSentAt: timestamp("trial_reminder_sent_at", {
+    withTimezone: true,
+  }),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

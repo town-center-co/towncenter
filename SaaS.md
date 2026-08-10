@@ -106,18 +106,40 @@ l'échec est une fuite de données.**
 
 ## Billing (Mollie)
 
-### Plan unique
+### Plan unique + essai 14 jours avec CB (décision 2026-08-10)
 
-Un seul plan, intentionnellement bas. Pas de free tier, pas de segmentation
-artificielle. €10/mois pour l'accès à la plateforme.
+Un seul plan, intentionnellement bas. Pas de free tier permanent — le
+self-host AGPL (avec ses propres clés Google) est le free tier. €10/mois pour
+l'accès à la plateforme, précédé d'un **essai de 14 jours avec carte** :
+
+- L'essai démarre quand le mandat est capturé par un **premier paiement
+  Mollie à 0,00 €** (carte/PayPal — rien n'est débité).
+- L'abonnement Mollie est créé immédiatement avec `startDate` = fin d'essai :
+  Mollie déclenche seul le premier prélèvement à J+14, aucun cron de
+  facturation chez nous.
+- **Email de rappel obligatoire à J-3** avant le premier prélèvement
+  (`scripts/trial-reminder.mts`, cron quotidien, idempotent via
+  `trial_reminder_sent_at`).
+- Annulation pendant l'essai = abonnement Mollie annulé avant son
+  `startDate`, aucun débit, accès jusqu'à la fin de l'essai.
+- Un seul essai par compte (`trial_ends_at` non-null = consommé) ; la
+  re-souscription passe par le même checkout 0 € mais l'abonnement démarre le
+  jour même.
+- Limites Pro pleines pendant l'essai (la friction CB gate l'abus).
 
 | Plan | Prix/mois |
 |---|---|
-| Pro | 10 € |
+| Pro | 10 € (14 j d'essai) |
 
 Tout le monde a le même plan. Les quotas ci-dessous sont des hard limits,
 pas des leviers d'upsell. Si le produit marche, le prix monte pour tout le
-monde — pas de grille à étages.
+monde — pas de grille à étages. (Le benchmark 2026-08-10 — Scrap.io,
+Pharow, Plausible &co — recommande 3 tiers 19/49/99 € à terme ; choix assumé
+de démarrer mono-plan pas cher pour acquérir.)
+
+Sans mandat (`none`) ou après expiration (`expired`), les actions coûteuses
+(zone, enrichissement, audit) sont refusées ; **la donnée déjà collectée
+reste toujours lisible.**
 
 ### Quotas mensuels (par organisation)
 
@@ -288,11 +310,15 @@ Infrastructure SaaS privée, hors repo public :
 - `/onboarding` simplifié (plus de Google key en SaaS)
 - `NEXT_PUBLIC_SAAS` gate sur les pages marketing vs app
 
-### Phase 6 : Password reset (~2 jours)
+### Phase 6 : Password reset — FAIT (2026-08-10, Resend)
 
-- SMTP : `app/api/auth/reset/`
-- Pages `/forgot-password`, `/reset-password`
-- Token store dans une nouvelle table `reset_tokens`
+- `lib/email/` : client Resend fetch (pattern `lib/billing/mollie.ts`),
+  inerte sans `RESEND_API_KEY` + `EMAIL_FROM` (le lien part dans les logs)
+- Pages `/forgot-password`, `/reset-password` ; tokens SHA-256 single-use
+  dans `password_reset_tokens` (TTL 30 min, cap 3/h)
+- `users.sessions_invalidated_at` : un reset tue toutes les sessions
+- Emails de cycle de vie : welcome, trial started, rappel J-3, activation,
+  suspension, annulation
 - Bénéficie au self-hosted et au SaaS
 
 ### Phase 7 : Admin dashboard (hors repo, ~3 jours)

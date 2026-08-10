@@ -20,10 +20,10 @@ import { and, desc, eq, gte, inArray, lte, ne, sql, type SQL } from "drizzle-orm
 
 import type { Account } from "@/lib/accounts";
 import { mollieEnabled, mollieTestMode } from "@/lib/billing/mollie";
+import { getQuotaUsage } from "@/lib/billing/quotas";
 import {
-  getQuotaPeriodStart,
-  getSubscriptionRow,
-  isSubscriptionCurrent,
+  getBillingState,
+  type BillingStateKind,
 } from "@/lib/billing/subscriptions";
 import {
   db,
@@ -1134,7 +1134,8 @@ export async function getCumulativeAreaKm2(owner: Account): Promise<{
   km2: number;
   maxKm2: number;
 }> {
-  const periodStart = await getQuotaPeriodStart(owner.id);
+  const billing = await getBillingState(owner.id);
+  const periodStart = billing.periodStart;
 
   const rows = await db
     .select({ bbox: zones.bbox })
@@ -1153,13 +1154,23 @@ export async function getCumulativeAreaKm2(owner: Account): Promise<{
 export type BillingFacts = {
   enabled: boolean;
   testMode: boolean;
+  /** The lifecycle stage; drives everything the billing page shows. */
+  state: BillingStateKind;
   /** "none" when the account never went near billing. */
   status: SubscriptionStatus | "none";
   /** Paid through now — `canceled` stays current until the period runs out. */
   current: boolean;
+  /** Non-null once a mandate opened a trial; the account gets exactly one. */
+  trialEndsAtIso: string | null;
   periodEndIso: string | null;
   usedKm2: number;
   maxKm2: number;
+  /** The three counted quotas beside the surface one. */
+  usage: {
+    harvest: { used: number; limit: number };
+    enrich: { used: number; limit: number };
+    audit: { used: number; limit: number };
+  };
 };
 
 export async function getBillingFacts(owner: Account): Promise<BillingFacts> {
@@ -1167,27 +1178,42 @@ export async function getBillingFacts(owner: Account): Promise<BillingFacts> {
     return {
       enabled: false,
       testMode: false,
+      state: "self-hosted",
       status: "none",
       current: false,
+      trialEndsAtIso: null,
       periodEndIso: null,
       usedKm2: 0,
       maxKm2: MAX_CUMULATIVE_AREA_KM2,
+      usage: {
+        harvest: { used: 0, limit: 0 },
+        enrich: { used: 0, limit: 0 },
+        audit: { used: 0, limit: 0 },
+      },
     };
   }
 
-  const [row, usage] = await Promise.all([
-    getSubscriptionRow(owner.id),
-    getCumulativeAreaKm2(owner),
+  const [billing, quotas] = await Promise.all([
+    getBillingState(owner.id),
+    getQuotaUsage(owner.id),
   ]);
+  const row = billing.row;
 
   return {
     enabled: true,
     testMode: mollieTestMode(),
+    state: billing.state,
     status: row?.status ?? "none",
-    current: isSubscriptionCurrent(row),
+    current: billing.state === "trial" || billing.state === "active",
+    trialEndsAtIso: row?.trialEndsAt?.toISOString() ?? null,
     periodEndIso: row?.currentPeriodEnd?.toISOString() ?? null,
-    usedKm2: usage.km2,
-    maxKm2: usage.maxKm2,
+    usedKm2: quotas.area.used,
+    maxKm2: quotas.area.limit,
+    usage: {
+      harvest: { used: quotas.harvest.used, limit: quotas.harvest.limit },
+      enrich: { used: quotas.enrich.used, limit: quotas.enrich.limit },
+      audit: { used: quotas.audit.used, limit: quotas.audit.limit },
+    },
   };
 }
 

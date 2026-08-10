@@ -2,6 +2,7 @@
 
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
 
 import {
@@ -17,6 +18,10 @@ import {
   normalizeEmail,
   verifyCredentials,
 } from "@/lib/accounts";
+import { mollieEnabled } from "@/lib/billing/mollie";
+import { TRIAL_DAYS } from "@/lib/billing/plans";
+import { sendEmail } from "@/lib/email/resend";
+import { welcomeEmail } from "@/lib/email/templates";
 import { PASSWORD_MAX, checkPasswordShape } from "@/lib/password";
 
 // a "use server" module may export only async functions, so the state types
@@ -194,6 +199,19 @@ export async function signUpAction(
     if (result.field === "_") return { ...base, error: result.message };
     return { ...base, fields: { [result.field]: result.message } };
   }
+
+  // registered BEFORE the redirect throw, runs after the response is sent.
+  // sendEmail never throws, so a mail outage cannot fail the signup.
+  const account = result.account;
+  after(() =>
+    sendEmail(
+      account.email,
+      welcomeEmail({
+        name: account.displayName,
+        trialDays: mollieEnabled() ? TRIAL_DAYS : null,
+      }),
+    ),
+  );
 
   await createSession(result.account.id);
   redirect("/onboarding");

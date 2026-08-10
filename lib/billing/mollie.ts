@@ -105,24 +105,31 @@ export async function createCustomer(input: {
   });
 }
 
+// The only methods Mollie accepts for a €0.00 first payment; anything else
+// needs at least €0.01 and would show a charge on a "free" trial signup.
+export const ZERO_AMOUNT_METHODS = ["creditcard", "paypal"] as const;
+
 export async function createFirstPayment(input: {
   customerId: string;
   ownerId: string;
-  priceCents: number;
+  amountCents: number;
   description: string;
   redirectUrl: string;
   webhookUrl: string;
+  /** Restrict the hosted checkout, e.g. to ZERO_AMOUNT_METHODS at €0.00. */
+  methods?: readonly string[];
 }): Promise<{ id: string; checkoutUrl: string }> {
   const payment = await mollie<MolliePayment>("/payments", {
     method: "POST",
     body: {
-      amount: { currency: "EUR", value: centsToValue(input.priceCents) },
+      amount: { currency: "EUR", value: centsToValue(input.amountCents) },
       customerId: input.customerId,
       sequenceType: "first",
       description: input.description,
       redirectUrl: input.redirectUrl,
       webhookUrl: input.webhookUrl,
       metadata: { ownerId: input.ownerId },
+      ...(input.methods ? { method: [...input.methods] } : {}),
     },
   });
 

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { Route } from "next";
 
 import { requireUser } from "@/lib/accounts";
-import { PRO_PLAN } from "@/lib/billing/plans";
+import { PRO_PLAN, TRIAL_DAYS } from "@/lib/billing/plans";
 import { MAX_ZONE_AREA_KM2 } from "@/lib/limits";
 import { LOCALE, TIME_ZONE } from "@/lib/format";
 import { getBillingFacts, type BillingFacts } from "@/app/queries";
@@ -97,27 +97,51 @@ function SelfHosted() {
 
 function statusLine(facts: BillingFacts): string {
   const until = facts.periodEndIso ? formatDay(facts.periodEndIso) : null;
+  const trialEnd = facts.trialEndsAtIso ? formatDay(facts.trialEndsAtIso) : null;
+  const price = `€${PRO_PLAN.priceCents / 100}`;
+
+  if (facts.state === "none") {
+    return facts.status === "pending"
+      ? "Checkout started but never completed. Start the trial to finish it."
+      : "No card on file yet. The trial starts the moment one is — nothing is charged today.";
+  }
+
+  if (facts.state === "trial") {
+    if (facts.status === "canceled") {
+      return trialEnd
+        ? `Trial canceled — access stays open until ${trialEnd}, and nothing will ever be charged.`
+        : "Trial canceled.";
+    }
+    return trialEnd
+      ? `Trial running — the first payment of ${price} goes out on ${trialEnd}. Cancel before then and nothing is charged.`
+      : "Trial running.";
+  }
+
+  if (facts.state === "expired") {
+    return "The trial or subscription has ended. Everything surveyed stays readable; subscribe to keep going.";
+  }
+
   switch (facts.status) {
-    case "none":
-      return "No subscription yet.";
-    case "pending":
-      return "Checkout started but never completed. Subscribe to finish it.";
     case "active":
       return until ? `Active — renews on ${until}.` : "Active.";
     case "canceled":
-      return facts.current && until
-        ? `Canceled — access stays open until ${until}.`
-        : "Canceled. Subscribe again to keep surveying past the trial ceiling.";
+      return until ? `Canceled — access stays open until ${until}.` : "Canceled.";
     case "suspended":
       return "A renewal payment failed and the subscription is suspended. Subscribe again to set up a new mandate.";
     case "completed":
       return "The subscription ran its course. Subscribe again to continue.";
+    default:
+      return "Active.";
   }
 }
 
 function SaasBilling({ facts }: { facts: BillingFacts }) {
-  const canSubscribe = !(facts.current && facts.status !== "canceled");
-  const canCancel = facts.status === "active";
+  const canSubscribe = facts.state === "none" || facts.state === "expired";
+  const canCancel =
+    facts.status === "active" &&
+    (facts.state === "trial" || facts.state === "active");
+  // one trial per account: once consumed, the same checkout charges right away
+  const trialAvailable = facts.trialEndsAtIso === null;
 
   return (
     <>
@@ -136,6 +160,10 @@ function SaasBilling({ facts }: { facts: BillingFacts }) {
             <span className={styles.period}>/month</span>
           </span>
         </div>
+        <p className="t-body-s tone-2">
+          {TRIAL_DAYS}-day free trial — card required, nothing charged until it
+          ends.
+        </p>
         <ul className={styles.limits}>
           <li>{PRO_PLAN.limits.harvestedTargets.toLocaleString(LOCALE)} businesses harvested</li>
           <li>{PRO_PLAN.limits.enrichments} Google Places enrichments</li>
@@ -150,27 +178,39 @@ function SaasBilling({ facts }: { facts: BillingFacts }) {
         <p className="t-body">{statusLine(facts)}</p>
         <p className="t-body-s tone-2">
           {facts.usedKm2.toFixed(1)} of {facts.maxKm2} km&sup2; surveyed{" "}
-          {facts.current ? "this period" : "so far"}.
+          {facts.current ? "this period" : "so far"} &middot;{" "}
+          {facts.usage.harvest.used.toLocaleString(LOCALE)} of{" "}
+          {facts.usage.harvest.limit.toLocaleString(LOCALE)} businesses &middot;{" "}
+          {facts.usage.enrich.used} of {facts.usage.enrich.limit} enrichments{" "}
+          &middot; {facts.usage.audit.used} of {facts.usage.audit.limit} audits
         </p>
 
         <div className={styles.actions}>
           {canSubscribe ? (
             <form action={subscribeAction}>
               <Button type="submit" variant="primary">
-                Subscribe — &euro;{PRO_PLAN.priceCents / 100}/month
+                {trialAvailable
+                  ? `Start the ${TRIAL_DAYS}-day free trial`
+                  : `Subscribe — €${PRO_PLAN.priceCents / 100}/month`}
               </Button>
             </form>
           ) : null}
           {canCancel ? (
             <form action={cancelSubscriptionAction}>
               <Button type="submit" variant="quiet">
-                Cancel the subscription
+                {facts.state === "trial"
+                  ? "Cancel the trial"
+                  : "Cancel the subscription"}
               </Button>
             </form>
           ) : null}
         </div>
 
         <p className="t-body-s tone-3">
+          {trialAvailable && canSubscribe
+            ? "A card is required to start the trial — €0.00 today, and the " +
+              "first payment only once the trial ends. "
+            : ""}
           Payments are handled by Mollie. Cancel any time — access stays open
           until the end of the paid period, and your data is yours to export.
         </p>

@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import type { Route } from "next";
 
 import { requireUser } from "@/lib/accounts";
+import { PRO_PLAN, TRIAL_DAYS } from "@/lib/billing/plans";
+import { MAX_ZONE_AREA_KM2 } from "@/lib/limits";
 import { getOnboardingFacts, type OnboardingFacts } from "@/app/queries";
 import { Button, Badge, Card, CardHeader, CardTitle } from "@/components/ui";
 import { WorldMap } from "@/components/gate/WorldMap";
@@ -254,24 +256,26 @@ function GridStep({ facts }: { facts: OnboardingFacts }) {
 }
 
 function UpgradeStep() {
+  const price = PRO_PLAN.priceCents / 100;
   return (
     <>
       <Badge asChild><h2>Plan</h2></Badge>
       <p className="t-body">
-        Towncenter is &euro;10/month, one plan, no tiers. Every feature is
-        included; the limits below are per month and per organisation.
+        Towncenter is a {TRIAL_DAYS}-day free trial, then &euro;{price}/month —
+        one plan, no tiers. A card is required to start the trial, but nothing
+        is charged until it ends, and cancelling before then costs nothing.
       </p>
       <Card className={styles.upgradeCard}>
         <div className={styles.upgradePlan}>
-          <span className={styles.upgradePlanName}>Pro</span>
-          <span className={styles.upgradePrice}>&euro;10<span className={styles.upgradePeriod}>/month</span></span>
+          <span className={styles.upgradePlanName}>{PRO_PLAN.name}</span>
+          <span className={styles.upgradePrice}>&euro;{price}<span className={styles.upgradePeriod}>/month</span></span>
         </div>
         <ul className={styles.upgradeLimits}>
-          <li>2 500 businesses harvested</li>
-          <li>300 Google Places enrichments</li>
-          <li>100 site audits</li>
-          <li>50 km&sup2; total surface</li>
-          <li>12 km&sup2; per zone</li>
+          <li>{PRO_PLAN.limits.harvestedTargets.toLocaleString("fr-FR")} businesses harvested</li>
+          <li>{PRO_PLAN.limits.enrichments} Google Places enrichments</li>
+          <li>{PRO_PLAN.limits.siteAudits} site audits</li>
+          <li>{PRO_PLAN.limits.cumulativeAreaKm2} km&sup2; total surface</li>
+          <li>{MAX_ZONE_AREA_KM2} km&sup2; per zone</li>
         </ul>
       </Card>
       <p className="t-body-s tone-2">
@@ -280,10 +284,10 @@ function UpgradeStep() {
       </p>
       <div className={styles.stepActions}>
         <a className={styles.upgradeCta} href="/billing">
-          Subscribe
+          Start the free trial
         </a>
         <Link href="/onboarding?step=sector" className={styles.stepLink}>
-          I&rsquo;ll subscribe later →
+          I&rsquo;ll decide later →
         </Link>
       </div>
     </>

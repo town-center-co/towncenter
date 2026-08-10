@@ -17,6 +17,7 @@
     "verify:scoring": "tsx scripts/verify-scoring.mts",
     "verify:tenancy": "node --conditions=react-server --import tsx --import ./scripts/bench-gate.mjs scripts/verify-tenancy.mts",
     "verify:actions": "node --conditions=react-server --import tsx --import ./scripts/bench-gate.mjs scripts/verify-actions.mts",
+    "trial:reminder": "node --conditions=react-server --import tsx scripts/trial-reminder.mts",
     "prepare": "husky"
   },
   "dependencies": {

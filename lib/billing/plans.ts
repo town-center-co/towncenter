@@ -4,6 +4,10 @@
 
 import { MAX_CUMULATIVE_AREA_KM2 } from "@/lib/limits";
 
+// Card-backed trial length. The mandate is captured with a €0.00 first
+// payment; Mollie runs the first real charge when the trial ends.
+export const TRIAL_DAYS = 14;
+
 export const PRO_PLAN = {
   id: "pro",
   name: "Pro",

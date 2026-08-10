@@ -1,13 +1,26 @@
 // Subscription state. One row per account (`subscriptions.owner_id` is the
 // primary key), written from exactly two places: the /billing actions and the
 // Mollie webhook. Everything here is inert without MOLLIE_API_KEY.
+//
+// The hosted lifecycle: signup → `none` (nothing costly allowed) → a €0.00
+// first payment captures a card mandate → 14-day trial on full Pro limits,
+// with a Mollie subscription scheduled for the trial's end → Mollie charges on
+// its own schedule → every paid webhook rolls the month forward. `expired` is
+// every dead end at once: trial never converted, suspension, cancellation past
+// its period. Data stays readable in every state; only surveying is gated.
 
 import "server-only";
 
 import { eq } from "drizzle-orm";
 
-import { db, subscriptions, type SubscriptionRow } from "@/lib/db";
 import type { Account } from "@/lib/accounts";
+import { db, subscriptions, users, type SubscriptionRow } from "@/lib/db";
+import { appUrl, sendEmail, type EmailContent } from "@/lib/email/resend";
+import {
+  subscriptionActivatedEmail,
+  subscriptionSuspendedEmail,
+  trialStartedEmail,
+} from "@/lib/email/templates";
 import type { SubscriptionStatus } from "@/lib/types";
 
 import {
@@ -15,9 +28,10 @@ import {
   createSubscription,
   getPayment,
   getSubscriptionAtMollie,
+  mollieEnabled,
   type MolliePayment,
 } from "./mollie";
-import { PRO_PLAN } from "./plans";
+import { PRO_PLAN, TRIAL_DAYS } from "./plans";
 
 export async function getSubscriptionRow(
   ownerId: string,
@@ -53,14 +67,51 @@ export function isSubscriptionCurrent(
   return row.currentPeriodEnd.getTime() > now.getTime();
 }
 
-// The quota window. A current subscription counts usage from its paid period;
-// anyone else counts from the beginning of time, which turns the monthly
-// ceiling into the unpaid trial's lifetime ceiling.
-export async function getQuotaPeriodStart(
+export type BillingStateKind =
+  | "self-hosted"
+  | "none"
+  | "trial"
+  | "active"
+  | "expired";
+
+export type BillingState = {
+  state: BillingStateKind;
+  /** Start of the usage window for `trial` and `active`; null otherwise. */
+  periodStart: Date | null;
+  row: SubscriptionRow | null;
+};
+
+// The one source of truth for what an account may do. Quotas count from
+// `periodStart`; `none` and `expired` refuse costly actions outright, and
+// `self-hosted` refuses nothing.
+export async function getBillingState(
   ownerId: string,
-): Promise<Date | null> {
+  now = new Date(),
+): Promise<BillingState> {
+  if (!mollieEnabled()) {
+    return { state: "self-hosted", periodStart: null, row: null };
+  }
+
   const row = await getSubscriptionRow(ownerId);
-  return isSubscriptionCurrent(row) ? row!.currentPeriodStart : null;
+  if (!row) return { state: "none", periodStart: null, row: null };
+
+  // the trial window wins over the subscription status: cancelling during the
+  // trial keeps access until its end, exactly like a paid period.
+  if (row.trialEndsAt && row.trialEndsAt.getTime() > now.getTime()) {
+    return { state: "trial", periodStart: row.currentPeriodStart, row };
+  }
+
+  if (isSubscriptionCurrent(row, now)) {
+    return { state: "active", periodStart: row.currentPeriodStart, row };
+  }
+
+  // a row with neither a consumed trial nor a paid period is an abandoned
+  // checkout: the account still owes the mandate.
+  if (!row.trialEndsAt && !row.currentPeriodEnd) {
+    return { state: "none", periodStart: null, row };
+  }
+
+  return { state: "expired", periodStart: null, row };
 }
 
 /** Returns the Mollie customer id, creating customer and row on first use. */
@@ -95,6 +146,10 @@ function addOneMonth(date: Date): Date {
   return next;
 }
 
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
 function toDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -112,50 +167,133 @@ async function findOwnerId(payment: MolliePayment): Promise<string | null> {
   return row?.ownerId ?? null;
 }
 
+// Lifecycle emails ride the webhook, so they must never fail it: contact
+// lookup, link building and sending all stay behind one catch, and sendEmail
+// itself never throws.
+async function notify(
+  ownerId: string,
+  build: (contact: { email: string; displayName: string | null }) => EmailContent,
+): Promise<void> {
+  try {
+    const [contact] = await db
+      .select({ email: users.email, displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, ownerId))
+      .limit(1);
+    if (!contact) return;
+    await sendEmail(contact.email, build(contact));
+  } catch (error) {
+    console.error(
+      "[billing] notification failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+function billingScreenUrl(): string {
+  return new URL("/billing", appUrl()).toString();
+}
+
 // The webhook body carries only a payment id; fetching it back from Mollie is
-// the authentication. Safe to replay: every branch is an idempotent upsert.
+// the authentication. Safe to replay: every branch is an idempotent upsert,
+// and every email is guarded by a state transition a replay cannot re-cross.
 export async function applyMolliePayment(paymentId: string): Promise<void> {
   const payment = await getPayment(paymentId);
   const ownerId = await findOwnerId(payment);
   if (!ownerId) return;
 
-  if (payment.status === "paid" && payment.paidAt) {
-    const periodStart = new Date(payment.paidAt);
-    const periodEnd = addOneMonth(periodStart);
+  // read BEFORE any upsert: the previous status is what decides whether a
+  // lifecycle email fires. A replay reads the already-updated row and stays
+  // silent.
+  const row = await getSubscriptionRow(ownerId);
+  const previousStatus: SubscriptionStatus | "none" = row?.status ?? "none";
 
-    const row = await getSubscriptionRow(ownerId);
+  // The €0.00 mandate payment: no money moved, the card is now chargeable.
+  // The only "first" payments this product creates are those zero-amount
+  // captures, so the sequence type is the whole discriminant. Zero-amount
+  // card payments may settle as "authorized" rather than "paid".
+  if (
+    payment.sequenceType === "first" &&
+    payment.customerId &&
+    (payment.status === "paid" || payment.status === "authorized")
+  ) {
+    // replay or double delivery: the subscription already exists, done.
+    if (row?.mollieSubscriptionId) return;
 
-    // First payment carries the mandate: start the recurring subscription one
-    // month out, since this payment already covers the first month.
-    if (
-      payment.sequenceType === "first" &&
-      payment.customerId &&
-      !row?.mollieSubscriptionId
-    ) {
+    const mandateAt = payment.paidAt ? new Date(payment.paidAt) : new Date();
+
+    if (!row?.trialEndsAt) {
+      // First mandate ever: open the trial and schedule the subscription for
+      // its end — Mollie runs the first real charge on that date by itself.
+      const trialEnd = addDays(mandateAt, TRIAL_DAYS);
       const created = await createSubscription({
         customerId: payment.customerId,
         ownerId,
         priceCents: PRO_PLAN.priceCents,
         interval: PRO_PLAN.interval,
         description: `Towncenter ${PRO_PLAN.name}`,
-        startDate: toDateOnly(periodEnd),
+        startDate: toDateOnly(trialEnd),
         webhookUrl: mollieWebhookUrl(),
       });
       await upsertSubscription(ownerId, {
         mollieCustomerId: payment.customerId,
         mollieSubscriptionId: created.id,
         status: "active",
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
+        currentPeriodStart: mandateAt,
+        currentPeriodEnd: trialEnd,
+        trialEndsAt: trialEnd,
+        trialReminderSentAt: null,
       });
+      await notify(ownerId, (contact) =>
+        trialStartedEmail({
+          name: contact.displayName,
+          firstChargeAt: trialEnd,
+          billingUrl: billingScreenUrl(),
+        }),
+      );
       return;
     }
+
+    // Trial already consumed: the new subscription starts today, so Mollie
+    // charges today. Access resumes when that charge lands as `paid` below.
+    const created = await createSubscription({
+      customerId: payment.customerId,
+      ownerId,
+      priceCents: PRO_PLAN.priceCents,
+      interval: PRO_PLAN.interval,
+      description: `Towncenter ${PRO_PLAN.name}`,
+      startDate: toDateOnly(mandateAt),
+      webhookUrl: mollieWebhookUrl(),
+    });
+    await upsertSubscription(ownerId, {
+      mollieCustomerId: payment.customerId,
+      mollieSubscriptionId: created.id,
+      status: "pending",
+    });
+    return;
+  }
+
+  if (payment.status === "paid" && payment.paidAt) {
+    // Real money: a subscription charge. Roll the paid month forward.
+    const periodStart = new Date(payment.paidAt);
+    const periodEnd = addOneMonth(periodStart);
 
     await upsertSubscription(ownerId, {
       status: "active",
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
     });
+
+    // recovery — after a suspension, an expiry or a cancellation — earns an
+    // email; ordinary renewals and replays do not.
+    if (previousStatus !== "active") {
+      await notify(ownerId, (contact) =>
+        subscriptionActivatedEmail({
+          name: contact.displayName,
+          periodEnd,
+        }),
+      );
+    }
     return;
   }
 
@@ -166,9 +304,18 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
       payment.customerId,
       payment.subscriptionId,
     );
-    const status: SubscriptionStatus =
-      subscription.status === "active" ? "active" : subscription.status;
+    const status: SubscriptionStatus = subscription.status;
+
     await upsertSubscription(ownerId, { status });
+
+    if (status === "suspended" && previousStatus !== "suspended") {
+      await notify(ownerId, (contact) =>
+        subscriptionSuspendedEmail({
+          name: contact.displayName,
+          billingUrl: billingScreenUrl(),
+        }),
+      );
+    }
   }
 
   // A first payment that failed or expired stays "pending": /billing offers

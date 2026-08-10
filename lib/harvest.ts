@@ -8,7 +8,8 @@ import "server-only";
 
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { getQuotaPeriodStart } from "@/lib/billing/subscriptions";
+import { MESSAGE_EXPIRED, MESSAGE_START_TRIAL } from "@/lib/billing/quotas";
+import { getBillingState } from "@/lib/billing/subscriptions";
 import { db, events, targets, zones, type NewTarget, type Zone } from "@/lib/db";
 import { areaKm2, normalizeBbox, pointInPolygon } from "@/lib/geo";
 import {
@@ -190,7 +191,7 @@ async function logSpotting(
 }
 
 export type ZoneRefusal = {
-  reason: "surface" | "naf";
+  reason: "surface" | "naf" | "billing";
   message: string;
 };
 
@@ -223,7 +224,17 @@ export async function openZone(
   }
 
   if (process.env.MOLLIE_API_KEY) {
-    const periodStart = await getQuotaPeriodStart(request.ownerId);
+    const billing = await getBillingState(request.ownerId);
+
+    // no mandate yet, or a lapsed one: nothing costly opens, data stays readable.
+    if (billing.state === "none") {
+      return { reason: "billing", message: MESSAGE_START_TRIAL };
+    }
+    if (billing.state === "expired") {
+      return { reason: "billing", message: MESSAGE_EXPIRED };
+    }
+
+    const periodStart = billing.periodStart;
 
     const existing = await db
       .select({ bbox: zones.bbox })

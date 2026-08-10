@@ -5,11 +5,13 @@
 // with an ASCII error key — never a thrown error, which would 500 the form.
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import type { Route } from "next";
 
 import { requireUser } from "@/lib/accounts";
 import {
   MollieError,
+  ZERO_AMOUNT_METHODS,
   cancelSubscriptionAtMollie,
   createFirstPayment,
   mollieEnabled,
@@ -22,7 +24,13 @@ import {
   markSubscriptionPending,
   mollieWebhookUrl,
 } from "@/lib/billing/subscriptions";
+import { sendEmail } from "@/lib/email/resend";
+import { subscriptionCanceledEmail } from "@/lib/email/templates";
 
+// One action for the trial and for every later re-subscription: the checkout
+// is always a €0.00 mandate capture, and the WEBHOOK decides what it opens —
+// a 14-day trial for a first-timer, an immediately-charging subscription for
+// an account whose trial is already consumed.
 export async function subscribeAction(): Promise<void> {
   const owner = await requireUser();
   if (!mollieEnabled()) redirect("/billing");
@@ -36,10 +44,11 @@ export async function subscribeAction(): Promise<void> {
     const payment = await createFirstPayment({
       customerId,
       ownerId: owner.id,
-      priceCents: PRO_PLAN.priceCents,
-      description: `Towncenter ${PRO_PLAN.name} — first month`,
+      amountCents: 0,
+      description: `Towncenter ${PRO_PLAN.name} — card setup`,
       redirectUrl: new URL("/billing", appUrl).toString(),
       webhookUrl: mollieWebhookUrl(),
+      methods: ZERO_AMOUNT_METHODS,
     });
 
     await markSubscriptionPending(owner.id);
@@ -69,6 +78,21 @@ export async function cancelSubscriptionAction(): Promise<void> {
       );
     }
     await markSubscriptionCanceled(owner.id);
+
+    // guarded on the previous status so a double submit sends one email, and
+    // registered before the redirect throw. sendEmail never throws.
+    if (row && row.status !== "canceled") {
+      const accessUntil = row.currentPeriodEnd;
+      after(() =>
+        sendEmail(
+          owner.email,
+          subscriptionCanceledEmail({
+            name: owner.displayName,
+            accessUntil,
+          }),
+        ),
+      );
+    }
   } catch (error) {
     console.error(
       "[billing] cancel failed:",

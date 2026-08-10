@@ -1771,6 +1771,14 @@ export function TerritoryMap({
                     <Link href={"/onboarding" as Route}>Setup</Link>
                   </DropdownMenuItem>
 
+                  {/* Only on the hosted service: self-hosted has no plan to
+                      manage, and the quota prop is its own billing switch. */}
+                  {cumulativeAreaKm2 !== null ? (
+                    <DropdownMenuItem asChild>
+                      <Link href={"/billing" as Route}>Billing</Link>
+                    </DropdownMenuItem>
+                  ) : null}
+
                   {/* The label names the DESTINATION, never the current
                       state: in a list, "Dark" alone reads as the state you
                       are already in. */}

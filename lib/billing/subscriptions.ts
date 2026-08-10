@@ -305,8 +305,15 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
       payment.subscriptionId,
     );
     const status: SubscriptionStatus = subscription.status;
+    const terminal =
+      status === "suspended" || status === "canceled" || status === "completed";
 
-    await upsertSubscription(ownerId, { status });
+    await upsertSubscription(ownerId, {
+      status,
+      // a dead Mollie subscription must not block the next checkout: the
+      // mandate branch above only creates one when this column is empty.
+      ...(terminal ? { mollieSubscriptionId: null } : {}),
+    });
 
     if (status === "suspended" && previousStatus !== "suspended") {
       await notify(ownerId, (contact) =>

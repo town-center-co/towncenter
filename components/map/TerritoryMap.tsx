@@ -15,7 +15,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ellipsis } from "lucide-react";
+import { ArrowRight, Ellipsis } from "lucide-react";
 import type {
   ExpressionSpecification,
   FilterSpecification,
@@ -1757,18 +1757,17 @@ export function TerritoryMap({
                     aria-expanded={toolsOpen}
                     onClick={() => setToolsOpen((open) => !open)}
                   >
-                    Sector settings
+                    Activity codes
                   </DropdownMenuItem>
 
-                  {/* The price grid drives every amount on this screen, but
-                      it lives on its own page: the sector settings change
-                      before each survey, the grid a few times a year. */}
+                  {/* The API key and the price grid drive every amount on this
+                      screen, but live on their own page: activity codes change
+                      before each survey, these change a few times a year. */}
                   <DropdownMenuItem asChild>
-                    <Link href={"/pricing" as Route}>Pricing</Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem asChild>
-                    <Link href={"/onboarding" as Route}>Setup</Link>
+                    <Link href={"/settings" as Route}>
+                      Settings
+                      <ArrowRight className="ml-auto" aria-hidden="true" />
+                    </Link>
                   </DropdownMenuItem>
 
                   {/* Only on the hosted service: self-hosted has no plan to
@@ -1887,7 +1886,7 @@ export function TerritoryMap({
                 </Button>
                 <p className="t-body-s tone-3">
                   Google first, then the in-house site audit. Enrichment needs a
-                  Google Places key — add one on the Setup screen, or set
+                  Google Places key — add one in Settings, or set
                   GOOGLE_PLACES_API_KEY. Google is the only source of a website
                   address, and the audit has nothing to read without one. It advances
                   nobody — it only adds facts.

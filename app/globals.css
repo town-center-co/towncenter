@@ -527,6 +527,12 @@ table,
   border-radius: 0;
 }
 
+/* Dropdown menu items carry their own inset focus ring (see dropdown-menu.tsx):
+   the global outline would stack a second, larger one around the same item. */
+[data-slot="dropdown-menu-item"]:focus-visible {
+  outline: none;
+}
+
 /* The system setting is the only one: there is no in-app motion toggle. Some
    animations need a DIFFERENT behaviour under reduced motion, not merely a
    faster one, so they override this rule where they are defined. */

@@ -481,6 +481,18 @@ export type OnboardingFacts = {
   isSaaS: boolean;
 };
 
+// the map route's gate: cheaper than getOnboardingFacts, since it only needs
+// the one column that marks the wizard as finished, skippable steps included.
+export async function isOnboarded(owner: Account): Promise<boolean> {
+  const [row] = await db
+    .select({ onboardedAt: users.onboardedAt })
+    .from(users)
+    .where(eq(users.id, owner.id))
+    .limit(1);
+
+  return row?.onboardedAt != null;
+}
+
 export async function getOnboardingFacts(
   owner: Account,
 ): Promise<OnboardingFacts> {

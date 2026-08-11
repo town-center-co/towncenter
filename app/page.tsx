@@ -2,12 +2,15 @@
 // time and the HTML freezes the database state, invisibly in `next dev`.
 // `PageProps<"/">` only exists after `next typegen`, which runs before `tsc`.
 
+import { redirect } from "next/navigation";
+
 import {
   getClusters,
   getCumulativeAreaKm2,
   getPriceGrid,
   getTargetDetail,
   getZoneStats,
+  isOnboarded,
   listFront,
   listTargetsInBbox,
   listZones,
@@ -47,6 +50,11 @@ const DEFAULT_NAF: string[] = SIRENE_TARGET_NAF.map((target) => target.code);
 export default async function Page(props: PageProps<"/">) {
   // the owner bounds EVERY read below, and is read first.
   const owner = await requireUser();
+
+  // checked before the heavier reads below: onboarding is otherwise only
+  // reachable right after signup, and a wizard abandoned mid-way would
+  // strand the account on a map it never finished setting up.
+  if (!(await isOnboarded(owner))) redirect("/onboarding");
 
   const params = await props.searchParams;
 

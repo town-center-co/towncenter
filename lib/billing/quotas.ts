@@ -8,10 +8,9 @@ import "server-only";
 
 import { and, eq, gte, sql } from "drizzle-orm";
 
-import { db, targets, zones } from "@/lib/db";
-import { areaKm2 } from "@/lib/geo";
-import type { Bbox } from "@/lib/types";
+import { db, targets } from "@/lib/db";
 
+import { getCumulativeAreaKm2 } from "./area";
 import { PRO_PLAN } from "./plans";
 import { getBillingState, type BillingState } from "./subscriptions";
 
@@ -52,15 +51,7 @@ async function countUsage(
   since: Date | null,
 ): Promise<number> {
   if (kind === "area") {
-    const rows = await db
-      .select({ bbox: zones.bbox })
-      .from(zones)
-      .where(
-        since
-          ? and(eq(zones.ownerId, ownerId), gte(zones.startedAt, since))
-          : eq(zones.ownerId, ownerId),
-      );
-    return rows.reduce((sum, row) => sum + areaKm2(row.bbox as Bbox), 0);
+    return getCumulativeAreaKm2(ownerId, since);
   }
 
   const column = {

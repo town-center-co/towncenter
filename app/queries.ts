@@ -19,6 +19,7 @@ import "server-only";
 import { and, desc, eq, gte, inArray, lte, ne, sql, type SQL } from "drizzle-orm";
 
 import type { Account } from "@/lib/accounts";
+import { getCumulativeAreaKm2 as readCumulativeAreaKm2 } from "@/lib/billing/area";
 import { mollieEnabled, mollieTestMode } from "@/lib/billing/mollie";
 import { getQuotaUsage } from "@/lib/billing/quotas";
 import {
@@ -1137,16 +1138,7 @@ export async function getCumulativeAreaKm2(owner: Account): Promise<{
   const billing = await getBillingState(owner.id);
   const periodStart = billing.periodStart;
 
-  const rows = await db
-    .select({ bbox: zones.bbox })
-    .from(zones)
-    .where(
-      periodStart
-        ? and(eq(zones.ownerId, owner.id), gte(zones.startedAt, periodStart))
-        : eq(zones.ownerId, owner.id),
-    );
-
-  const km2 = rows.reduce((sum, row) => sum + areaKm2(row.bbox as Bbox), 0);
+  const km2 = await readCumulativeAreaKm2(owner.id, periodStart);
 
   return { km2, maxKm2: MAX_CUMULATIVE_AREA_KM2 };
 }

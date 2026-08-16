@@ -6,8 +6,9 @@
 
 import "server-only";
 
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
+import { getCumulativeAreaKm2 } from "@/lib/billing/area";
 import { MESSAGE_EXPIRED, MESSAGE_START_TRIAL } from "@/lib/billing/quotas";
 import { getBillingState } from "@/lib/billing/subscriptions";
 import { db, events, targets, zones, type NewTarget, type Zone } from "@/lib/db";
@@ -245,21 +246,10 @@ export async function openZone(
         sql`select pg_advisory_xact_lock(hashtext(${request.ownerId}))`,
       );
 
-      const existing = await tx
-        .select({ bbox: zones.bbox })
-        .from(zones)
-        .where(
-          billing.periodStart
-            ? and(
-                eq(zones.ownerId, request.ownerId),
-                gte(zones.startedAt, billing.periodStart),
-              )
-            : eq(zones.ownerId, request.ownerId),
-        );
-
-      const cumulative = existing.reduce(
-        (sum, row) => sum + areaKm2(row.bbox as Bbox),
-        0,
+      const cumulative = await getCumulativeAreaKm2(
+        request.ownerId,
+        billing.periodStart,
+        tx,
       );
 
       if (cumulative + area > MAX_CUMULATIVE_AREA_KM2) {

@@ -31,8 +31,11 @@ import { subscriptionCanceledEmail } from "@/lib/email/templates";
 // is always a €0.00 mandate capture, and the WEBHOOK decides what it opens —
 // a 14-day trial for a first-timer, an immediately-charging subscription for
 // an account whose trial is already consumed.
-export async function subscribeAction(): Promise<void> {
+export async function subscribeAction(formData: FormData): Promise<void> {
   const owner = await requireUser();
+  if (formData.get("terms") !== "accepted") {
+    redirect("/billing?error=terms");
+  }
   if (!mollieEnabled()) redirect("/billing");
 
   let checkoutUrl: string;

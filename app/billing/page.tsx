@@ -41,6 +41,10 @@ const NOTICES: Record<string, { tone: "error" | "ok"; text: string }> = {
     tone: "error",
     text: "The cancellation did not go through. Try again, or come back later.",
   },
+  "error:terms": {
+    tone: "error",
+    text: "Confirm the professional-use terms before starting the trial.",
+  },
   "canceled:1": {
     tone: "ok",
     text: "Subscription canceled. Access stays open until the paid period ends.",
@@ -188,6 +192,16 @@ function SaasBilling({ facts }: { facts: BillingFacts }) {
         <div className={styles.actions}>
           {canSubscribe ? (
             <form action={subscribeAction}>
+              <label className={styles.acceptance}>
+                <input name="terms" type="checkbox" value="accepted" required />
+                <span>
+                  I am subscribing for professional use and accept the{" "}
+                  <a href="https://town-center.co/terms" target="_blank">
+                    terms of service
+                  </a>
+                  .
+                </span>
+              </label>
               <Button type="submit" variant="primary">
                 {trialAvailable
                   ? `Start the ${TRIAL_DAYS}-day free trial`
@@ -212,7 +226,8 @@ function SaasBilling({ facts }: { facts: BillingFacts }) {
               "first payment only once the trial ends. "
             : ""}
           Payments are handled by Mollie. Cancel any time — access stays open
-          until the end of the paid period, and your data is yours to export.
+          until the end of the paid period and your existing data stays
+          readable.
         </p>
       </Card>
     </>

@@ -223,65 +223,70 @@ export async function openZone(
     };
   }
 
-  if (process.env.MOLLIE_API_KEY) {
-    const billing = await getBillingState(request.ownerId);
-
-    // no mandate yet, or a lapsed one: nothing costly opens, data stays readable.
-    if (billing.state === "none") {
-      return { reason: "billing", message: MESSAGE_START_TRIAL };
-    }
-    if (billing.state === "expired") {
-      return { reason: "billing", message: MESSAGE_EXPIRED };
-    }
-
-    const periodStart = billing.periodStart;
-
-    const existing = await db
-      .select({ bbox: zones.bbox })
-      .from(zones)
-      .where(
-        periodStart
-          ? and(
-              eq(zones.ownerId, request.ownerId),
-              gte(zones.startedAt, periodStart),
-            )
-          : eq(zones.ownerId, request.ownerId),
-      );
-
-    const cumulative = existing.reduce(
-      (sum, row) => sum + areaKm2(row.bbox as Bbox),
-      0,
-    );
-
-    if (cumulative + area > MAX_CUMULATIVE_AREA_KM2) {
-      const total = cumulative + area;
-      return {
-        reason: "surface",
-        message: `Cumulative limit reached: ${cumulative.toFixed(1)} km² already surveyed this period. Adding ${area.toFixed(1)} km² would reach ${total.toFixed(1)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²). Manage your plan on the Billing screen.`,
-      };
-    }
-  }
-
   const nafCodes =
     request.nafCodes && request.nafCodes.length > 0
       ? [...request.nafCodes]
       : [...SIRENE_DEFAULT_NAF_CODES];
+  const billing = process.env.MOLLIE_API_KEY
+    ? await getBillingState(request.ownerId)
+    : null;
 
-  const [created] = await db
-    .insert(zones)
-    .values({
-      ownerId: request.ownerId,
-      label: request.label ?? null,
-      bbox,
-      nafCodes,
-    })
-    .returning({ id: zones.id });
-
-  if (!created) {
-    return { reason: "surface", message: "Sector cannot be opened." };
+  // no mandate yet, or a lapsed one: nothing costly opens, data stays readable.
+  if (billing?.state === "none") {
+    return { reason: "billing", message: MESSAGE_START_TRIAL };
+  }
+  if (billing?.state === "expired") {
+    return { reason: "billing", message: MESSAGE_EXPIRED };
   }
 
-  return { zoneId: created.id, bbox, nafCodes };
+  return db.transaction(async (tx) => {
+    if (billing) {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${request.ownerId}))`,
+      );
+
+      const existing = await tx
+        .select({ bbox: zones.bbox })
+        .from(zones)
+        .where(
+          billing.periodStart
+            ? and(
+                eq(zones.ownerId, request.ownerId),
+                gte(zones.startedAt, billing.periodStart),
+              )
+            : eq(zones.ownerId, request.ownerId),
+        );
+
+      const cumulative = existing.reduce(
+        (sum, row) => sum + areaKm2(row.bbox as Bbox),
+        0,
+      );
+
+      if (cumulative + area > MAX_CUMULATIVE_AREA_KM2) {
+        const total = cumulative + area;
+        return {
+          reason: "surface" as const,
+          message: `Cumulative limit reached: ${cumulative.toFixed(1)} km² already surveyed this period. Adding ${area.toFixed(1)} km² would reach ${total.toFixed(1)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²). Manage your plan on the Billing screen.`,
+        };
+      }
+    }
+
+    const [created] = await tx
+      .insert(zones)
+      .values({
+        ownerId: request.ownerId,
+        label: request.label ?? null,
+        bbox,
+        nafCodes,
+      })
+      .returning({ id: zones.id });
+
+    if (!created) {
+      return { reason: "surface" as const, message: "Sector cannot be opened." };
+    }
+
+    return { zoneId: created.id, bbox, nafCodes };
+  });
 }
 
 // a `failed` sector is resumable, a `done` one is not.

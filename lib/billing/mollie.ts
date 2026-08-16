@@ -22,7 +22,7 @@ export function mollieEnabled(): boolean {
   return Boolean(process.env.MOLLIE_API_KEY?.trim());
 }
 
-/** True when the key charges real cards: drives the "test mode" banner. */
+/** True for Mollie sandbox keys: drives the test-mode banner. */
 export function mollieTestMode(): boolean {
   return Boolean(process.env.MOLLIE_API_KEY?.trim().startsWith("test_"));
 }
@@ -33,7 +33,11 @@ function centsToValue(cents: number): string {
 
 async function mollie<T>(
   path: string,
-  init?: { method?: string; body?: Record<string, unknown> },
+  init?: {
+    method?: string;
+    body?: Record<string, unknown>;
+    idempotencyKey?: string;
+  },
 ): Promise<T> {
   const key = process.env.MOLLIE_API_KEY?.trim();
   if (!key) throw new MollieError("Billing is not enabled on this instance.", 0);
@@ -43,6 +47,9 @@ async function mollie<T>(
     headers: {
       Authorization: `Bearer ${key}`,
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.idempotencyKey
+        ? { "Idempotency-Key": init.idempotencyKey }
+        : {}),
     },
     body: init?.body ? JSON.stringify(init.body) : undefined,
     cache: "no-store",
@@ -88,6 +95,7 @@ export type MollieSubscription = {
   id: string;
   status: "pending" | "active" | "canceled" | "suspended" | "completed";
   nextPaymentDate?: string;
+  metadata?: { ownerId?: string; mandatePaymentId?: string } | null;
 };
 
 export async function createCustomer(input: {
@@ -150,9 +158,10 @@ export async function createSubscription(input: {
   priceCents: number;
   interval: string;
   description: string;
-  /** `YYYY-MM-DD`; the first month is covered by the first payment. */
+  /** `YYYY-MM-DD`; Mollie makes the first real charge on this date. */
   startDate: string;
   webhookUrl: string;
+  mandatePaymentId: string;
 }): Promise<MollieSubscription> {
   return mollie(
     `/customers/${encodeURIComponent(input.customerId)}/subscriptions`,
@@ -164,9 +173,34 @@ export async function createSubscription(input: {
         description: input.description,
         startDate: input.startDate,
         webhookUrl: input.webhookUrl,
-        metadata: { ownerId: input.ownerId },
+        metadata: {
+          ownerId: input.ownerId,
+          mandatePaymentId: input.mandatePaymentId,
+        },
       },
+      idempotencyKey: `towncenter-subscription-${input.mandatePaymentId}`,
     },
+  );
+}
+
+export async function findReusableSubscription(
+  customerId: string,
+  ownerId: string,
+  mandatePaymentId: string,
+): Promise<MollieSubscription | null> {
+  const page = await mollie<{
+    _embedded?: { subscriptions?: MollieSubscription[] };
+  }>(
+    `/customers/${encodeURIComponent(customerId)}/subscriptions?limit=250&sort=desc`,
+  );
+  return (
+    page._embedded?.subscriptions?.find(
+      (subscription) =>
+        subscription.metadata?.mandatePaymentId === mandatePaymentId ||
+        (subscription.metadata?.ownerId === ownerId &&
+          (subscription.status === "active" ||
+            subscription.status === "pending")),
+    ) ?? null
   );
 }
 

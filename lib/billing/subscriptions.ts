@@ -11,7 +11,7 @@
 
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import type { Account } from "@/lib/accounts";
 import { db, subscriptions, users, type SubscriptionRow } from "@/lib/db";
@@ -26,6 +26,7 @@ import type { SubscriptionStatus } from "@/lib/types";
 import {
   createCustomer,
   createSubscription,
+  findReusableSubscription,
   getPayment,
   getSubscriptionAtMollie,
   mollieEnabled,
@@ -220,56 +221,72 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
     // replay or double delivery: the subscription already exists, done.
     if (row?.mollieSubscriptionId) return;
 
+    const customerId = payment.customerId;
     const mandateAt = payment.paidAt ? new Date(payment.paidAt) : new Date();
 
-    if (!row?.trialEndsAt) {
-      // First mandate ever: open the trial and schedule the subscription for
-      // its end — Mollie runs the first real charge on that date by itself.
-      const trialEnd = addDays(mandateAt, TRIAL_DAYS);
-      const created = await createSubscription({
-        customerId: payment.customerId,
-        ownerId,
-        priceCents: PRO_PLAN.priceCents,
-        interval: PRO_PLAN.interval,
-        description: `Towncenter ${PRO_PLAN.name}`,
-        startDate: toDateOnly(trialEnd),
-        webhookUrl: mollieWebhookUrl(),
-      });
-      await upsertSubscription(ownerId, {
-        mollieCustomerId: payment.customerId,
-        mollieSubscriptionId: created.id,
-        status: "active",
-        currentPeriodStart: mandateAt,
-        currentPeriodEnd: trialEnd,
-        trialEndsAt: trialEnd,
-        trialReminderSentAt: null,
-      });
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}))`);
+      const [lockedRow] = await tx
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.ownerId, ownerId))
+        .limit(1);
+      if (lockedRow?.mollieSubscriptionId) return null;
+
+      const startsTrial = !lockedRow?.trialEndsAt;
+      const periodEnd = startsTrial ? addDays(mandateAt, TRIAL_DAYS) : null;
+      const created =
+        (await findReusableSubscription(
+          customerId,
+          ownerId,
+          payment.id,
+        )) ??
+        (await createSubscription({
+          customerId,
+          ownerId,
+          priceCents: PRO_PLAN.priceCents,
+          interval: PRO_PLAN.interval,
+          description: `Towncenter ${PRO_PLAN.name}`,
+          startDate: toDateOnly(periodEnd ?? mandateAt),
+          webhookUrl: mollieWebhookUrl(),
+          mandatePaymentId: payment.id,
+        }));
+
+      const patch = startsTrial
+        ? {
+            mollieCustomerId: customerId,
+            mollieSubscriptionId: created.id,
+            status: "active" as const,
+            currentPeriodStart: mandateAt,
+            currentPeriodEnd: periodEnd,
+            trialEndsAt: periodEnd,
+            trialReminderSentAt: null,
+          }
+        : {
+            mollieCustomerId: customerId,
+            mollieSubscriptionId: created.id,
+            status: "pending" as const,
+          };
+
+      await tx
+        .insert(subscriptions)
+        .values({ ownerId, ...patch })
+        .onConflictDoUpdate({
+          target: subscriptions.ownerId,
+          set: { ...patch, updatedAt: new Date() },
+        });
+      return { startsTrial, periodEnd };
+    });
+
+    if (result?.startsTrial && result.periodEnd) {
       await notify(ownerId, (contact) =>
         trialStartedEmail({
           name: contact.displayName,
-          firstChargeAt: trialEnd,
+          firstChargeAt: result.periodEnd!,
           billingUrl: billingScreenUrl(),
         }),
       );
-      return;
     }
-
-    // Trial already consumed: the new subscription starts today, so Mollie
-    // charges today. Access resumes when that charge lands as `paid` below.
-    const created = await createSubscription({
-      customerId: payment.customerId,
-      ownerId,
-      priceCents: PRO_PLAN.priceCents,
-      interval: PRO_PLAN.interval,
-      description: `Towncenter ${PRO_PLAN.name}`,
-      startDate: toDateOnly(mandateAt),
-      webhookUrl: mollieWebhookUrl(),
-    });
-    await upsertSubscription(ownerId, {
-      mollieCustomerId: payment.customerId,
-      mollieSubscriptionId: created.id,
-      status: "pending",
-    });
     return;
   }
 

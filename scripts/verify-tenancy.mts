@@ -28,7 +28,7 @@ import {
   listZones,
 } from "@/app/queries";
 import type { Account } from "@/lib/accounts";
-import { createAccount, verifyCredentials } from "@/lib/accounts";
+import { createAccount, signupState, verifyCredentials } from "@/lib/accounts";
 import {
   accountSettings,
   db,
@@ -41,12 +41,14 @@ import {
   zones,
 } from "@/lib/db";
 import { DEFAULT_PRICE_GRID } from "@/lib/priceGrid";
+import { getAccountPlacesKey, savePlacesKey } from "@/lib/settings";
 import type { Bbox, PriceGrid } from "@/lib/types";
 
 // The bench opens signups for itself: it signs one account up at the end, and on
 // a database that already holds accounts signups are closed exactly as in
 // production. Set in this process only; it touches neither the repo nor the hosting.
 process.env.ALLOW_SIGNUPS = "true";
+process.env.AUTH_SECRET ??= "towncenter-bench-secret-at-least-32-characters";
 
 let failures = 0;
 let checks = 0;
@@ -384,16 +386,27 @@ async function main() {
   // Account settings: one row per account, and a missing row is the normal state.
 
   {
-    await db
-      .insert(accountSettings)
-      .values({ ownerId: bob.id, googlePlacesKey: "AIzaSyB-bob-secret" })
-      .onConflictDoUpdate({
-        target: accountSettings.ownerId,
-        set: { googlePlacesKey: "AIzaSyB-bob-secret" },
-      });
+    const placesKey = "AIzaSyB-bob-secret";
+    await savePlacesKey(bob.id, placesKey);
+
+    const [storedSetting] = await db
+      .select({ key: accountSettings.googlePlacesKey })
+      .from(accountSettings)
+      .where(eq(accountSettings.ownerId, bob.id))
+      .limit(1);
 
     const bobFacts = await getOnboardingFacts(bob);
     const aliceFacts = await getOnboardingFacts(alice);
+
+    check(
+      "an account key is encrypted at rest",
+      Boolean(storedSetting?.key) && storedSetting?.key !== placesKey,
+      storedSetting?.key?.startsWith("enc:v1.") ? "sealed" : "not sealed",
+    );
+    check(
+      "the encrypted account key decrypts for server use",
+      (await getAccountPlacesKey(bob.id)) === placesKey,
+    );
 
     check(
       "the key saved by an account is the one it reads back",
@@ -530,6 +543,21 @@ async function main() {
     !again.ok && again.field === "email",
     again.ok ? "a second account was created" : again.message,
   );
+
+  const savedAllowSignups = process.env.ALLOW_SIGNUPS;
+  const savedSaas = process.env.NEXT_PUBLIC_SAAS;
+  process.env.ALLOW_SIGNUPS = "";
+  process.env.NEXT_PUBLIC_SAAS = "true";
+  const saasSignup = await signupState();
+  check(
+    "SaaS mode keeps signup open without the self-hosted override",
+    saasSignup.open && !saasSignup.isFirstAccount,
+    saasSignup.reason || "open",
+  );
+  if (savedAllowSignups === undefined) delete process.env.ALLOW_SIGNUPS;
+  else process.env.ALLOW_SIGNUPS = savedAllowSignups;
+  if (savedSaas === undefined) delete process.env.NEXT_PUBLIC_SAAS;
+  else process.env.NEXT_PUBLIC_SAAS = savedSaas;
 
   // Cleanup
 

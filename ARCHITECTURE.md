@@ -25,8 +25,8 @@ busy — a number with no fact behind it does not belong here.
 ## Where the product is going, and what that repeals
 
 **Since 2026-08-04: a target you take becomes a project that holds its
-documents** — the quote, the mockup, the deliverables. Further out, **a hosted
-instance**; self-hosting stays a first-class path under AGPL, permanently.
+documents** — the quote, the mockup, the deliverables. A hosted service now
+runs the same AGPL binary; self-hosting stays a first-class path permanently.
 
 > [!WARNING]
 > The previous rule said the exact opposite and is **repealed**: "a target once
@@ -34,16 +34,16 @@ instance**; self-hosting stays a first-class path under AGPL, permanently.
 > reinstate it believing you are correcting a scope drift — it is a decision,
 > and it is dated.
 
-**None of that layer is built.** Six tables — `users`, `targets`, `zones`,
-`events`, `price_grids`, `account_settings` — and zero stored bytes: no object
-storage, no blob column, no multipart handler. Until a table exists, the docs
-say "to be built", not "coming soon".
+**The project and document layer is not built.** The hosted service adds
+subscriptions and password-reset tokens, but still stores zero document bytes:
+no object storage, no blob column, no multipart handler. Until a table exists,
+the docs say "to be built", not "coming soon".
 
 Three things do not move with the widening:
 
-- **Still not a CRM.** No sales cycles, teams, roles, email sending, imported
-  lists. The line is sharp: a quote attached to a project is a **document**; a
-  configurable pipeline with stages is a CRM.
+- **Still not a CRM.** No sales cycles, teams, roles, sales email sending, or
+  imported lists. The line is sharp: a quote attached to a project is a
+  **document**; a configurable pipeline with stages is a CRM.
 - **The map stays the product.** Projects are reached **from** a target you
   took, never a parallel tab.
 - **Any new table carrying `owner_id` joins `scripts/verify-tenancy.mts` in the
@@ -66,7 +66,7 @@ modules. Node 22+. No test framework: three executable benches under
 | `lib/scoring.ts` | Price and probability. Pure. |
 | `lib/priceGrid.ts` | `DEFAULT_PRICE_GRID`, its validation schema, `standardDealCents(grid)` |
 | `lib/sources/` | SIRENE, IGN geocoder, Google Places, in-repo site audit |
-| `lib/db/schema.ts` | The six tables and their indexes |
+| `lib/db/schema.ts` | The eight tables and their indexes |
 | `scripts/verify-*.mts` | The benches |
 
 ---
@@ -181,7 +181,13 @@ address.
 
 ## Data model, database and tenancy
 
-Six tables: `users`, `targets`, `zones`, `events`, `price_grids`, `account_settings`.
+Eight tables: `users`, `targets`, `zones`, `events`, `price_grids`,
+`account_settings`, `subscriptions`, `password_reset_tokens`.
+
+**The hosted v1 tenant is one user account.** Every owned row carries
+`owner_id`; a subscription and a price grid are each keyed by that same user.
+There are no organizations, memberships, invitations, or shared territories in
+v1. Adding them is a later schema change, not an assumption callers may make.
 
 **`rowid` does not exist in Postgres.** Two reads relied on it to break ties
 between facts written in the same second; without a tiebreak, "roll back"
@@ -309,7 +315,8 @@ Any Node 22 host with Postgres. `npm start` runs the migrations
 > instance capped at 20 connections, a few builds in a row hand
 > `FATAL: too many clients already` to real users.
 
-Required: `AUTH_SECRET` (32 characters minimum), `DATABASE_URL`,
+Required: `AUTH_SECRET` (32 characters minimum; it also encrypts stored account
+API keys), `DATABASE_URL`,
 `GOOGLE_PLACES_API_KEY`. Optional: `ALLOW_SIGNUPS`. See
 [`.env.example`](.env.example). **No secret is ever copied into a tracked
 file.**

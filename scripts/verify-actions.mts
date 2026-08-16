@@ -23,6 +23,7 @@ import {
   restoreTargetAction,
   rollbackTargetAction,
 } from "@/app/actions";
+import { subscribeAction } from "@/app/billing/actions";
 import { signInAction, signOutAction, signUpAction } from "@/app/login/actions";
 import { INITIAL_SIGNIN_STATE, INITIAL_SIGNUP_STATE } from "@/app/login/state";
 import {
@@ -40,7 +41,19 @@ import {
 } from "@/app/queries";
 import type { Account } from "@/lib/accounts";
 import { getSession } from "@/lib/auth";
-import { db, events, targets, users, zones, type NewTarget } from "@/lib/db";
+import {
+  db,
+  events,
+  subscriptions,
+  targets,
+  users,
+  zones,
+  type NewTarget,
+} from "@/lib/db";
+import { areaKm2 } from "@/lib/geo";
+import { openZone } from "@/lib/harvest";
+import { applyMolliePayment } from "@/lib/billing/subscriptions";
+import { MAX_CUMULATIVE_AREA_KM2 } from "@/lib/limits";
 import { DEFAULT_PRICE_GRID } from "@/lib/priceGrid";
 import { isPlacesConfigured } from "@/lib/sources/places";
 import type { Bbox, PriceGrid } from "@/lib/types";
@@ -247,11 +260,126 @@ async function main() {
 
   const actor = await createOwner("actor", SESSION_ID);
   const stranger = await createOwner("stranger");
+  const quotaOwner = await createOwner("quota");
 
   check(
     "the bench runs with NO Google key",
     !isPlacesConfigured(),
     "no request can be billed",
+  );
+
+  // Concurrent zone requests must serialize the quota read and insertion.
+  const quotaBbox: Bbox = {
+    minLat: 48,
+    maxLat: 48.03,
+    minLng: 2,
+    maxLng: 2.025,
+  };
+  const quotaArea = areaKm2(quotaBbox);
+  const seededZones = Math.floor(MAX_CUMULATIVE_AREA_KM2 / quotaArea) - 1;
+  const quotaStartedAt = new Date(Date.now() - DAY_MS);
+  await db.insert(subscriptions).values({
+    ownerId: quotaOwner.id,
+    status: "active",
+    currentPeriodStart: quotaStartedAt,
+    currentPeriodEnd: new Date(Date.now() + 28 * DAY_MS),
+  });
+  await db.insert(zones).values(
+    Array.from({ length: seededZones }, (_, index) => ({
+      ownerId: quotaOwner.id,
+      label: `Quota seed ${index}`,
+      bbox: quotaBbox,
+      nafCodes: [],
+      startedAt: new Date(quotaStartedAt.getTime() + index + 1),
+    })),
+  );
+
+  const savedMollieKey = process.env.MOLLIE_API_KEY;
+  process.env.MOLLIE_API_KEY = "test_bench";
+  const concurrentZones = await Promise.all([
+    openZone({ ownerId: quotaOwner.id, bbox: quotaBbox }),
+    openZone({ ownerId: quotaOwner.id, bbox: quotaBbox }),
+  ]);
+  if (savedMollieKey === undefined) delete process.env.MOLLIE_API_KEY;
+  else process.env.MOLLIE_API_KEY = savedMollieKey;
+
+  const openedZones = concurrentZones.filter((result) => "zoneId" in result);
+  const refusedZones = concurrentZones.filter(
+    (result) => "reason" in result && result.reason === "surface",
+  );
+  check(
+    "concurrent sectors cannot cross the cumulative area quota",
+    openedZones.length === 1 && refusedZones.length === 1,
+    `${openedZones.length} opened, ${refusedZones.length} refused`,
+  );
+
+  // Two mandate payments racing after a double checkout must create one subscription.
+  await db.insert(subscriptions).values({
+    ownerId: stranger.id,
+    mollieCustomerId: "cst_bench",
+    status: "pending",
+  });
+  const realFetch = globalThis.fetch;
+  const realAppUrl = process.env.APP_URL;
+  const realMollieKey = process.env.MOLLIE_API_KEY;
+  const mollieSubscriptions: Array<Record<string, unknown>> = [];
+  let subscriptionCreates = 0;
+  process.env.APP_URL = "https://app.towncenter.test";
+  process.env.MOLLIE_API_KEY = "test_bench";
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes("/payments/")) {
+      return Response.json({
+        id: url.endsWith("tr_bench_one") ? "tr_bench_one" : "tr_bench_two",
+        status: "authorized",
+        customerId: "cst_bench",
+        sequenceType: "first",
+        metadata: { ownerId: stranger.id },
+      });
+    }
+    if (init?.method === "POST" && url.includes("/subscriptions")) {
+      subscriptionCreates += 1;
+      const body = JSON.parse(String(init.body)) as {
+        metadata: Record<string, unknown>;
+      };
+      const created = {
+        id: `sub_bench_${subscriptionCreates}`,
+        status: "active",
+        metadata: body.metadata,
+      };
+      mollieSubscriptions.unshift(created);
+      return Response.json(created);
+    }
+    if (url.includes("/subscriptions")) {
+      return Response.json({
+        _embedded: { subscriptions: mollieSubscriptions },
+      });
+    }
+    throw new Error(`Unexpected Mollie bench request: ${url}`);
+  };
+
+  try {
+    await Promise.all([
+      applyMolliePayment("tr_bench_one"),
+      applyMolliePayment("tr_bench_two"),
+    ]);
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realAppUrl === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = realAppUrl;
+    if (realMollieKey === undefined) delete process.env.MOLLIE_API_KEY;
+    else process.env.MOLLIE_API_KEY = realMollieKey;
+  }
+
+  const [billingRow] = await db
+    .select({ subscriptionId: subscriptions.mollieSubscriptionId })
+    .from(subscriptions)
+    .where(eq(subscriptions.ownerId, stranger.id))
+    .limit(1);
+  check(
+    "concurrent mandate webhooks create one Mollie subscription",
+    subscriptionCreates === 1 && billingRow?.subscriptionId === "sub_bench_1",
+    `${subscriptionCreates} created`,
   );
 
   // Google's 30-day deadline. Driven by READS, so no enrichment run is needed:
@@ -1049,8 +1177,22 @@ async function main() {
     .where(sql`${users.email} like ${EMAIL_LIKE}`);
   check(
     "no account was created by any of those refusals",
-    Number(strayAccounts?.total) === 2,
-    `${strayAccounts?.total} accounts, the two seeded`,
+    Number(strayAccounts?.total) === 3,
+    `${strayAccounts?.total} accounts, the three seeded`,
+  );
+
+  let termsRequired = false;
+  try {
+    await subscribeAction(form({}));
+  } catch (error) {
+    termsRequired =
+      error instanceof Error &&
+      error.message.includes("redirect(/billing?error=terms)");
+  }
+  check(
+    "billing refuses checkout until professional terms are accepted",
+    termsRequired,
+    "no Mollie call",
   );
 
   // requireUser() on the first line: with no valid session every action must end

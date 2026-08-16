@@ -9,14 +9,14 @@ file covers setup, benches and pull request rules.
 ## Where the product is going
 
 Since 2026-08-04 the scope reaches past the signature: **a target you take
-becomes a project that holds its documents** — quote, mockup, deliverables —
-and a hosted instance is the longer-term ambition. Self-hosting stays a
-first-class path under AGPL, permanently.
+becomes a project that holds its documents** — quote, mockup, deliverables.
+The hosted service runs the same binary; self-hosting stays a first-class path
+under AGPL permanently.
 
-**None of that layer exists yet** — six tables, zero uploaded bytes. That is
-the open ground for contributions, with two boundaries that hold regardless:
-it is still not a CRM (no sales cycles, no teams, no roles, no email sending),
-and the map is not allowed to become one view among several.
+**The project and document layer does not exist yet** — there are no uploaded
+bytes. That is the open ground for contributions, with two boundaries that hold
+regardless: it is still not a CRM (no sales cycles, teams, roles, or sales email
+sending), and the map cannot become one view among several.
 
 ---
 

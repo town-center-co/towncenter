@@ -56,7 +56,7 @@ pattern.
 
 | Variable | Required | What it is |
 |---|---|---|
-| `AUTH_SECRET` | yes | Signs session tokens. 32 characters minimum. Changing it logs everyone out. |
+| `AUTH_SECRET` | yes | Signs sessions and encrypts account API keys. 32 characters minimum. Rotating it logs everyone out and requires saved account keys to be entered again. |
 | `DATABASE_URL` | yes | Postgres 14+. `.env.example` matches the bundled compose file. |
 | `GOOGLE_PLACES_API_KEY` | for enrichment | Places API (New). Server-side only. An account key set on Setup wins over it. |
 | `ALLOW_SIGNUPS` | no | Reopens signups after the first account. |

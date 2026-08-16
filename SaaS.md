@@ -1,374 +1,139 @@
-# Towncenter → SaaS — Architecture
+# Towncenter hosted service
 
-## Principe
+## Product model
 
-Un seul repo (`towncenter`, public, AGPL), shared database, billing dans le
-repo (inactif sans clés Mollie). Exactement le modèle Plausible.
+Towncenter ships one public AGPL binary. Self-hosted and hosted deployments run
+the same code and schema. Billing, paid quotas, and hosted onboarding become
+active only when their environment variables are present.
 
-```
-towncenter/
-├── src/                  # AGPL — tout le code
-│   ├── app/              # Pages, Server Actions, API routes
-│   ├── lib/              # Scoring, DB, auth, sources, billing
-│   ├── components/       # UI, map
-│   └── ...
-├── scripts/              # Benches, migrations
-├── LICENSE               # AGPL v3
-└── ...
-```
+The hosted v1 is deliberately single-user: one `users` row is one tenant. Its
+territory, events, price grid, settings, and subscription are isolated by
+`owner_id`. There are no organizations, memberships, invitations, teams, or
+shared territories in v1.
 
-Le code billing est dans le repo, compilé partout, inopérant sans
-`MOLLIE_API_KEY`. Self-hosted = même binaire, billing caché, quotas off.
+This is a shared Postgres deployment, not a dedicated application or database
+per customer. Marketing and legal copy must not call it a dedicated instance.
 
----
+Self-hosting remains a first-class path. With no Mollie key, billing is inert
+and quotas are unlimited.
 
-## Base de données : shared database
+## Schema
 
-Une seule DB Postgres. `organization_id` sur chaque table comme nouvelle
-colonne d'isolation. `owner_id` reste (qui a fait l'action ≠ à qui
-appartient la donnée).
+The hosted layer adds two tables to the six core tables:
 
-### Nouvelles tables
+```text
+subscriptions
+  owner_id                  text primary key references users on delete cascade
+  mollie_customer_id        text
+  mollie_subscription_id    text
+  plan_id                   text not null default 'pro'
+  status                    text not null default 'pending'
+  current_period_start      timestamptz
+  current_period_end        timestamptz
+  trial_ends_at             timestamptz
+  trial_reminder_sent_at    timestamptz
+  created_at                timestamptz not null default now()
+  updated_at                timestamptz not null default now()
 
-```sql
-organizations
-  id         text PRIMARY KEY
-  name       text NOT NULL
-  slug       text NOT NULL UNIQUE
-  created_at timestamptz NOT NULL DEFAULT now()
-
-subscriptions            -- gated by MOLLIE_API_KEY
-  organization_id        text PRIMARY KEY REFERENCES organizations
-  mollie_customer_id     text
-  mollie_subscription_id text
-  plan_id                text NOT NULL DEFAULT 'pro'
-  status                 text NOT NULL DEFAULT 'active'
-  current_period_start   timestamptz NOT NULL
-  current_period_end     timestamptz
-  created_at             timestamptz NOT NULL DEFAULT now()
-  updated_at             timestamptz NOT NULL DEFAULT now()
+password_reset_tokens
+  id                        text primary key
+  user_id                   text not null references users on delete cascade
+  token_hash                text not null unique
+  expires_at                timestamptz not null
+  created_at                timestamptz not null default now()
 ```
 
-### Colonnes ajoutées aux tables existantes
+`users.sessions_invalidated_at` invalidates sessions created before a completed
+password reset. Quota usage is derived from existing target and zone rows; no
+usage-counter table exists.
 
-Chaque table existante gagne `organization_id text NOT NULL REFERENCES
-organizations(id)`. `price_grids` et `account_settings` passent en clé
-composite `(organization_id)` au lieu de `(owner_id)`.
+## Signup and authentication
 
-```sql
-users              + organization_id
-targets            + organization_id
-zones              + organization_id, + area_km2 double precision
-events             + organization_id
-price_grids        + organization_id  (PK composite)
-account_settings   + organization_id  (PK composite)
-```
+When `NEXT_PUBLIC_SAAS=true`, signups stay open automatically. A new account
+signs in immediately and enters SaaS onboarding: price grid, plan explanation,
+then the first sector. The platform supplies the Google Places key.
 
----
+Without SaaS mode, the first self-hosted account owns the instance and closes
+registration. `ALLOW_SIGNUPS=true` reopens additional self-hosted accounts.
 
-## Authentification
+The session identifies a user account. Every exported read receives that
+account first, and every owned query filters by `owner_id`.
+`scripts/verify-tenancy.mts` is the executable isolation contract.
 
-### Signup (mode SaaS, `NEXT_PUBLIC_SAAS=true`)
+## Billing and trial
 
-1. User remplit email + mot de passe + nom d'org + slug
-2. `signUpAction` crée l'utilisateur ET l'organisation
-3. L'utilisateur devient admin de son org
-4. Redirection vers `/onboarding` (price grid uniquement, plus de Google key)
+There is one Pro plan at €10 per month with a card-backed 14-day trial.
 
-### Signup (mode self-hosted, `NEXT_PUBLIC_SAAS` absent)
+1. Checkout creates a Mollie customer and a €0 first payment.
+2. Mollie captures a reusable card or PayPal mandate without charging it.
+3. The payment webhook opens the trial and schedules the subscription for the
+   trial end date.
+4. Mollie performs the first €10 charge after 14 days and sends its payment
+   webhook.
+5. A daily job sends the required reminder three days before the first charge.
 
-1. Comportement actuel inchangé
-2. Premier user → owner de l'instance, signups fermées
-3. Une org implicite créée automatiquement (transparent pour l'utilisateur)
+Canceling during the trial prevents the first charge and keeps access until the
+trial ends. Canceling a paid subscription keeps access through the paid period.
+A consumed trial is never granted again. Existing data stays readable after
+expiry; costly surveying actions stop.
 
-### Session
+## Monthly quotas
 
-Le cookie JWT porte `organizationId`. `requireUser()` devient
-`requireMembership()` et retourne `{ user, organization }`.
+| Resource | Limit | Source |
+|---|---:|---|
+| Businesses harvested | 2,500 | `targets.harvested_at` |
+| Google Places enrichments | 300 | `targets.google_fetched_at` |
+| Site audits | 100 | `targets.audited_at` |
+| Total area surveyed | 50 km² | Sum of zone bounding-box areas |
+| Area per zone | 12 km² | Geometry guard before insertion |
 
-### `proxy.ts`
+Counts start at the current trial or paid-period boundary. The cumulative-area
+check and zone insertion run in one transaction under an account-scoped
+Postgres advisory lock, so concurrent requests cannot cross the limit.
 
-Ajoute la vérification que l'user appartient bien à l'org. Le cookie sans
-`organizationId` = redirect login.
+## Email
 
----
+Resend sends welcome, password-reset, trial-started, trial-reminder,
+subscription-activated, suspended, and canceled messages. Password-reset tokens
+are SHA-256 hashes, expire after 30 minutes, are single-use, and are limited to
+three requests per hour per account.
 
-## Queries : isolation par `organization_id`
+Without `RESEND_API_KEY` and `EMAIL_FROM`, messages are logged instead of sent.
+Email failure never fails signup, password reset, or a Mollie webhook.
 
-Chaque query exportée dans `app/queries.ts` ajoute
-`eq(table.organizationId, organization.id)` à sa clause `WHERE`.
+## Environment
 
-`scripts/verify-tenancy.mts` est étendu : il vérifie que chaque query ne
-retourne que les lignes du bon `organization_id`. **Le seul bench dont
-l'échec est une fuite de données.**
-
----
-
-## Billing (Mollie)
-
-### Plan unique + essai 14 jours avec CB (décision 2026-08-10)
-
-Un seul plan, intentionnellement bas. Pas de free tier permanent — le
-self-host AGPL (avec ses propres clés Google) est le free tier. €10/mois pour
-l'accès à la plateforme, précédé d'un **essai de 14 jours avec carte** :
-
-- L'essai démarre quand le mandat est capturé par un **premier paiement
-  Mollie à 0,00 €** (carte/PayPal — rien n'est débité).
-- L'abonnement Mollie est créé immédiatement avec `startDate` = fin d'essai :
-  Mollie déclenche seul le premier prélèvement à J+14, aucun cron de
-  facturation chez nous.
-- **Email de rappel obligatoire à J-3** avant le premier prélèvement
-  (`scripts/trial-reminder.mts`, cron quotidien, idempotent via
-  `trial_reminder_sent_at`).
-- Annulation pendant l'essai = abonnement Mollie annulé avant son
-  `startDate`, aucun débit, accès jusqu'à la fin de l'essai.
-- Un seul essai par compte (`trial_ends_at` non-null = consommé) ; la
-  re-souscription passe par le même checkout 0 € mais l'abonnement démarre le
-  jour même.
-- Limites Pro pleines pendant l'essai (la friction CB gate l'abus).
-
-| Plan | Prix/mois |
+| Variable | Purpose |
 |---|---|
-| Pro | 10 € (14 j d'essai) |
+| `DATABASE_URL` | Shared Postgres connection |
+| `AUTH_SECRET` | Session signing and account API-key encryption secret |
+| `APP_URL` | Canonical hosted origin and callback base |
+| `NEXT_PUBLIC_SAAS=true` | SaaS onboarding and permanently open signup |
+| `MOLLIE_API_KEY` | Billing, trial, and quota enforcement |
+| `GOOGLE_PLACES_API_KEY` | Platform enrichment key |
+| `RESEND_API_KEY` | Transactional email provider |
+| `EMAIL_FROM` | Verified sender identity |
+| `ALLOW_SIGNUPS` | Additional self-hosted accounts only |
 
-Tout le monde a le même plan. Les quotas ci-dessous sont des hard limits,
-pas des leviers d'upsell. Si le produit marche, le prix monte pour tout le
-monde — pas de grille à étages. (Le benchmark 2026-08-10 — Scrap.io,
-Pharow, Plausible &co — recommande 3 tiers 19/49/99 € à terme ; choix assumé
-de démarrer mono-plan pas cher pour acquérir.)
+## Deployment contract
 
-Sans mandat (`none`) ou après expiration (`expired`), les actions coûteuses
-(zone, enrichissement, audit) sont refusées ; **la donnée déjà collectée
-reste toujours lisible.**
+The application service runs `npm start`, which applies committed Drizzle
+migrations before starting Next.js. Mollie calls `/api/mollie/webhook`. A
+separate daily Railway job runs `npm run trial:reminder`.
 
-### Quotas mensuels (par organisation)
+Before opening traffic, verify:
 
-Tous dérivés de la donnée existante, pas de table `usage_counters`. Le
-`checkQuota()` fait un `SELECT COUNT` / `SELECT SUM` sur la période de
-billing en cours.
+- `npm run lint`, `npm run typecheck`, `npm run verify`, and `npm run build`;
+- signup, onboarding, mandate capture, trial start, reminder, first charge,
+  cancellation, expiry, and re-subscription against Mollie test mode;
+- welcome and password-reset delivery from the verified Resend domain;
+- database backup and restore, application health checks, and error alerts;
+- account data-access and deletion requests through the published contact channel;
+- self-hosted startup with all SaaS environment variables absent.
 
-| Ressource | Limite/mois | Source |
-|---|---|---|
-| Targets harvestés | 2 500 | `COUNT targets WHERE harvested_at > period_start` |
-| Google Places enrichments | 300 | `COUNT targets WHERE google_fetched_at > period_start` |
-| Site audits | 100 | `COUNT targets WHERE audited_at > period_start` |
-| Surface totale prospectée | 50 km² | `SUM zones.area_km2 WHERE started_at > period_start` |
-| Surface max par zone | 12 km² | Hard limit (existant, `MAX_ZONE_AREA_KM2`) |
+## Outside this repository
 
-La limite de surface totale est le vrai garde-fou : elle empêche de
-cartographier la France entière pour 10 €. Chaque zone complétée stocke son
-`area_km2` (calculé depuis le bbox par `lib/geo.ts`). Le cumul mensuel est
-comparé au plafond avant d'ouvrir une nouvelle zone.
-
-### Colonne ajoutée à `zones`
-
-```sql
-zones + area_km2 double precision  -- calculé à la complétion de la zone
-```
-
-### Fichiers
-
-```
-src/lib/billing/
-├── plans.ts         # Plan unique et ses limites
-├── mollie.ts        # Client Mollie (gated by MOLLIE_API_KEY)
-├── quotas.ts        # checkQuota(kind, organizationId)
-└── subscriptions.ts # CRUD subscriptions
-
-src/app/(app)/billing/
-├── page.tsx         # Plan actuel, usage, bouton subscribe/manage
-└── actions.ts       # createCheckoutSession, createPortalSession
-
-src/app/api/mollie/webhook/route.ts  # Webhook handler (gated by env)
-```
-
-### Gate : env vars
-
-| Env var | Absent (self-hosted) | Présent (SaaS) |
-|---|---|---|
-| `MOLLIE_API_KEY` | Pages billing → "Self-hosted", quotas → ∞ | Billing actif, quotas enforced |
-| `NEXT_PUBLIC_SAAS` | Signup classique, pas de slug | Signup avec org |
-
-### Flow de souscription
-
-1. User sur `/billing` → `createCheckoutSession`
-2. Server Action crée une checkout session Mollie → retourne l'URL
-3. Redirection vers la page hosted Mollie
-4. Paiement effectué → Mollie appelle le webhook
-5. Webhook met à jour `subscriptions` → statut `active`
-6. User redirigé vers `/billing?success=true`
-
-### Quotas
-
-```typescript
-// lib/billing/quotas.ts
-type QuotaKind = 'harvest' | 'enrich' | 'audit' | 'area';
-
-interface QuotaStatus {
-  allowed: boolean;
-  used: number;
-  limit: number;
-}
-
-export async function checkQuota(
-  kind: QuotaKind,
-  organizationId: string
-): Promise<QuotaStatus> {
-  if (!process.env.MOLLIE_API_KEY) {
-    return { allowed: true, used: 0, limit: Infinity };
-  }
-
-  const sub = await getSubscription(organizationId);
-  const periodStart = sub.currentPeriodStart;
-  const limits = PLANS[sub.planId].limits;
-  const used = await getUsage(kind, organizationId, periodStart);
-
-  return {
-    allowed: used < limits[kind],
-    used,
-    limit: limits[kind],
-  };
-}
-```
-
-Appelé en première ligne des actions `harvestZoneAction`,
-`enrichZoneAction`, `enrichTargetAction`, et avant l'ouverture d'une
-nouvelle zone (`harvestZoneAction` vérifie le cumul `area`). Si quota
-dépassé → toast + lien vers `/billing`.
-
----
-
-## Suppression du setup Google Places Key
-
-En mode SaaS, `GOOGLE_PLACES_API_KEY` est une env var d'instance (fournie
-par la plateforme). Les actions `testPlacesKeyAction`,
-`savePlacesKeyAction`, `removePlacesKeyAction` sont gardées pour le mode
-self-hosted mais cachées en SaaS. La page `/onboarding` saute l'étape
-Google key quand `NEXT_PUBLIC_SAAS=true`.
-
----
-
-## Ce qui reste dans `account_settings`
-
-Le champ `google_places_key` reste pour le self-hosted. En SaaS, il n'est
-jamais écrit. La table garde sa structure.
-
----
-
-## Ce qui n'est PAS dans le repo
-
-Infrastructure SaaS privée, hors repo public :
-
-- **Admin dashboard** — lit la DB partagée en read-only. Outil interne
-  (Retool, Grafana, ou une mini app Next.js séparée). Liste les orgs, leur
-  plan, leur usage, permet de suspendre/réactiver.
-- **Reverse proxy** — Caddy/Traefik, routing `towncenter.fr`.
-- **Email templates** — welcome, reset password, invoice.
-- **Monitoring** — health checks, alerts.
-
----
-
-## Plan d'implémentation — 8 phases
-
-### Phase 1 : Organizations & schema (~1 semaine)
-
-- Créer `organizations`, `subscriptions` dans `lib/db/schema.ts`
-- Ajouter `organization_id` à toutes les tables existantes
-- Ajouter `area_km2` à `zones` (calculé à la complétion depuis le bbox)
-- Migration + backfill (une org par `owner_id` existant)
-- `requireUser()` → `requireMembership()`
-- Signup crée une org automatiquement (SaaS et self-hosted)
-- Étendre `verify-tenancy.mts` avec `organization_id`
-- Tous les tests passent : `npm run verify && npm run typecheck && npm run lint`
-
-### Phase 2 : Auth & routing (~3 jours)
-
-- Cookie JWT porte `organizationId`
-- `proxy.ts` vérifie l'appartenance à l'org
-- Self-hosted : une org implicite, transparente
-- Login/signup pages adaptées au mode SaaS (champ org name + slug)
-
-### Phase 3 : Mollie billing (~1.5 semaines)
-
-- `lib/billing/` : plans, client Mollie, quotas, subscriptions
-- `app/(app)/billing/` : page plan actuel, subscribe/manage
-- `app/api/mollie/webhook/` : handler webhook
-- Gate : tout est inactif sans `MOLLIE_API_KEY`
-- Tests en mode test Mollie
-
-### Phase 4 : Quotas (~3 jours)
-
-- `checkQuota()` dans `lib/billing/quotas.ts` (harvest, enrich, audit, area)
-- Intégration dans `harvestZoneAction`, `enrichZoneAction`, `enrichTargetAction`
-- `harvestZoneAction` vérifie le cumul `area` avant d'ouvrir une zone
-- `UsageBar` dans le header (targets, enrichments, surface)
-- Toast + lien `/billing` si quota dépassé
-
-### Phase 5 : Landing & onboarding SaaS (~3 jours)
-
-- `app/(marketing)/` : landing page, pricing page
-- `/onboarding` simplifié (plus de Google key en SaaS)
-- `NEXT_PUBLIC_SAAS` gate sur les pages marketing vs app
-
-### Phase 6 : Password reset — FAIT (2026-08-10, Resend)
-
-- `lib/email/` : client Resend fetch (pattern `lib/billing/mollie.ts`),
-  inerte sans `RESEND_API_KEY` + `EMAIL_FROM` (le lien part dans les logs)
-- Pages `/forgot-password`, `/reset-password` ; tokens SHA-256 single-use
-  dans `password_reset_tokens` (TTL 30 min, cap 3/h)
-- `users.sessions_invalidated_at` : un reset tue toutes les sessions
-- Emails de cycle de vie : welcome, trial started, rappel J-3, activation,
-  suspension, annulation
-- Bénéficie au self-hosted et au SaaS
-
-### Phase 7 : Admin dashboard (hors repo, ~3 jours)
-
-- Mini app Next.js privée ou dashboard Retool
-- Lecture read-only de la DB partagée
-- Liste des orgs, plan, usage, statut
-- Actions : suspendre, réactiver
-
-### Phase 8 : Polish & self-hosted parity (~2 jours)
-
-- Vérifier le flow self-hosted de bout en bout
-- `NEXT_PUBLIC_SAAS` absent → tout fonctionne comme avant
-- Docs self-hosted mises à jour (password reset, billing absent)
-- Tests de non-régression
-
-**Total : ~5 semaines**
-
----
-
-## Décisions clés
-
-1. **Shared database, pas database-per-tenant.** Une seule DB, isolation par
-   `organization_id`. `verify-tenancy.mts` garantit l'absence de fuite.
-   C'est le modèle Plausible.
-
-2. **Billing dans le repo public, inactif sans clés.** Transparence totale.
-   Self-hosters lisent le code, ne peuvent pas l'utiliser. Aucun build
-   flag nécessaire pour le billing — juste des env vars.
-
-3. **`organization_id` ET `owner_id` sur chaque table.** Le premier répond
-   à "à qui appartient la donnée", le second à "qui a fait l'action". Les
-   deux colonnes, toujours.
-
-4. **Single user par org en v1.** La première personne qui signe up dans
-   une org en est l'admin. La table `users` supporte déjà plusieurs
-   utilisateurs — les invitations viendront plus tard.
-
-5. **Pas de Google Places Key par compte en SaaS.** La plateforme fournit
-   la clé via `GOOGLE_PLACES_API_KEY`. Le self-hosted garde sa clé par
-   compte. Les deux modes cohabitent dans le même code.
-
-6. **Mollie pour le paiement.** Provider européen, API propre, subscriptions
-   natives. Le code billing est une couche fine (~400 lignes).
-
-7. **Pas de `saas/` directory.** Le code SaaS (billing, landing, admin API)
-   vit dans `src/` avec le reste. Pas de build multi-target. Tout est
-   compilé, rien n'est caché. Les features SaaS sont gated par env vars,
-   pas par compilation.
-
-8. **Le bench `verify-tenancy.mts` est non-négociable.** Chaque nouvelle
-   query, chaque nouvelle table avec `organization_id` doit y être
-   vérifiée. Même sanction : un échec = une fuite de données.
+Infrastructure credentials, database backups, monitoring, alerts, and any
+internal administrative dashboard remain private operational concerns. An
+admin tool may inspect or suspend an account, but it must not introduce teams,
+roles, sales pipelines, or cross-account access into the product.

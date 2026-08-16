@@ -106,6 +106,7 @@ export async function isFreshInstance(): Promise<boolean> {
 }
 
 function signupsAllowedByEnv(): boolean {
+  if (process.env.NEXT_PUBLIC_SAAS === "true") return true;
   const raw = process.env.ALLOW_SIGNUPS?.trim().toLowerCase() ?? "";
   return raw === "1" || raw === "true" || raw === "yes";
 }

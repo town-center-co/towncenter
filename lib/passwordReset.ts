@@ -153,7 +153,18 @@ export async function resetPassword(
   const passwordHash = await hashPassword(newPassword);
   const now = new Date();
 
-  await db.transaction(async (tx) => {
+  const applied = await db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .delete(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.tokenHash, hashToken(token)),
+          gt(passwordResetTokens.expiresAt, now),
+        ),
+      )
+      .returning({ userId: passwordResetTokens.userId });
+    if (!claimed || claimed.userId !== row.userId) return false;
+
     await tx
       .update(users)
       .set({
@@ -169,7 +180,9 @@ export async function resetPassword(
     await tx
       .delete(passwordResetTokens)
       .where(eq(passwordResetTokens.userId, row.userId));
+
+    return true;
   });
 
-  return { ok: true };
+  return applied ? { ok: true } : { ok: false, message: INVALID_LINK };
 }

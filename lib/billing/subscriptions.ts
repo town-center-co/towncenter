@@ -69,11 +69,7 @@ export function isSubscriptionCurrent(
 }
 
 export type BillingStateKind =
-  | "self-hosted"
-  | "none"
-  | "trial"
-  | "active"
-  | "expired";
+  "self-hosted" | "none" | "trial" | "active" | "expired";
 
 export type BillingState = {
   state: BillingStateKind;
@@ -143,7 +139,13 @@ export async function markSubscriptionCanceled(ownerId: string): Promise<void> {
 
 function addOneMonth(date: Date): Date {
   const next = new Date(date);
+  const day = next.getUTCDate();
+  next.setUTCDate(1);
   next.setUTCMonth(next.getUTCMonth() + 1);
+  const lastDay = new Date(
+    Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  next.setUTCDate(Math.min(day, lastDay));
   return next;
 }
 
@@ -173,7 +175,10 @@ async function findOwnerId(payment: MolliePayment): Promise<string | null> {
 // itself never throws.
 async function notify(
   ownerId: string,
-  build: (contact: { email: string; displayName: string | null }) => EmailContent,
+  build: (contact: {
+    email: string;
+    displayName: string | null;
+  }) => EmailContent,
 ): Promise<void> {
   try {
     const [contact] = await db
@@ -236,11 +241,7 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
       const startsTrial = !lockedRow?.trialEndsAt;
       const periodEnd = startsTrial ? addDays(mandateAt, TRIAL_DAYS) : null;
       const created =
-        (await findReusableSubscription(
-          customerId,
-          ownerId,
-          payment.id,
-        )) ??
+        (await findReusableSubscription(customerId, ownerId, payment.id)) ??
         (await createSubscription({
           customerId,
           ownerId,
@@ -295,15 +296,43 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
     const periodStart = new Date(payment.paidAt);
     const periodEnd = addOneMonth(periodStart);
 
-    await upsertSubscription(ownerId, {
-      status: "active",
-      currentPeriodStart: periodStart,
-      currentPeriodEnd: periodEnd,
+    const transition = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}))`);
+      const [lockedRow] = await tx
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.ownerId, ownerId))
+        .limit(1);
+      if (
+        lockedRow?.currentPeriodStart &&
+        lockedRow.currentPeriodStart.getTime() >= periodStart.getTime()
+      ) {
+        return null;
+      }
+
+      await tx
+        .insert(subscriptions)
+        .values({
+          ownerId,
+          status: "active",
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+        })
+        .onConflictDoUpdate({
+          target: subscriptions.ownerId,
+          set: {
+            status: "active",
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            updatedAt: new Date(),
+          },
+        });
+      return { previousStatus: lockedRow?.status ?? "none" };
     });
 
     // recovery — after a suspension, an expiry or a cancellation — earns an
     // email; ordinary renewals and replays do not.
-    if (previousStatus !== "active") {
+    if (transition && transition.previousStatus !== "active") {
       await notify(ownerId, (contact) =>
         subscriptionActivatedEmail({
           name: contact.displayName,

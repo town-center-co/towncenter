@@ -8,6 +8,8 @@
 // deleted at the end, including when an assertion fails, and the bench is
 // runnable twice in a row.
 
+import { createHash } from "node:crypto";
+
 import { and, eq, or, sql } from "drizzle-orm";
 
 import { initialActionState } from "@/app/actionState";
@@ -34,16 +36,13 @@ import {
   INITIAL_PRICE_GRID_STATE,
   type PriceGridState,
 } from "@/app/pricing/state";
-import {
-  getPriceGrid,
-  getTargetDetail,
-  getTargetRow,
-} from "@/app/queries";
+import { getPriceGrid, getTargetDetail, getTargetRow } from "@/app/queries";
 import type { Account } from "@/lib/accounts";
 import { getSession } from "@/lib/auth";
 import {
   db,
   events,
+  passwordResetTokens,
   subscriptions,
   targets,
   users,
@@ -54,6 +53,7 @@ import { areaKm2 } from "@/lib/geo";
 import { openZone } from "@/lib/harvest";
 import { applyMolliePayment } from "@/lib/billing/subscriptions";
 import { MAX_CUMULATIVE_AREA_KM2 } from "@/lib/limits";
+import { resetPassword } from "@/lib/passwordReset";
 import { DEFAULT_PRICE_GRID } from "@/lib/priceGrid";
 import { isPlacesConfigured } from "@/lib/sources/places";
 import type { Bbox, PriceGrid } from "@/lib/types";
@@ -172,7 +172,13 @@ async function seedTarget(
 async function seedZone(owner: Account, label: string): Promise<string> {
   const [row] = await db
     .insert(zones)
-    .values({ ownerId: owner.id, label, bbox: FRAME, nafCodes: [], status: "done" })
+    .values({
+      ownerId: owner.id,
+      label,
+      bbox: FRAME,
+      nafCodes: [],
+      status: "done",
+    })
     .returning({ id: zones.id });
 
   if (!row) throw new Error("Test sector was not created.");
@@ -180,7 +186,11 @@ async function seedZone(owner: Account, label: string): Promise<string> {
 }
 
 async function readTarget(id: string) {
-  const [row] = await db.select().from(targets).where(eq(targets.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(targets)
+    .where(eq(targets.id, id))
+    .limit(1);
   if (!row) throw new Error(`Test target ${id} disappeared.`);
   return row;
 }
@@ -249,7 +259,9 @@ async function pastRevalidate(
 async function cleanup(): Promise<void> {
   await db
     .delete(users)
-    .where(or(sql`${users.email} like ${EMAIL_LIKE}`, eq(users.id, SESSION_ID)));
+    .where(
+      or(sql`${users.email} like ${EMAIL_LIKE}`, eq(users.id, SESSION_ID)),
+    );
 }
 
 async function main() {
@@ -261,6 +273,8 @@ async function main() {
   const actor = await createOwner("actor", SESSION_ID);
   const stranger = await createOwner("stranger");
   const quotaOwner = await createOwner("quota");
+  const renewalOwner = await createOwner("renewal");
+  const resetOwner = await createOwner("reset");
 
   check(
     "the bench runs with NO Google key",
@@ -284,6 +298,21 @@ async function main() {
     currentPeriodStart: quotaStartedAt,
     currentPeriodEnd: new Date(Date.now() + 28 * DAY_MS),
   });
+
+  const resetToken = "bench-reset-token";
+  await db.insert(passwordResetTokens).values({
+    userId: resetOwner.id,
+    tokenHash: createHash("sha256").update(resetToken).digest("base64url"),
+    expiresAt: new Date(Date.now() + DAY_MS),
+  });
+  const resetOutcomes = await Promise.all([
+    resetPassword(resetToken, "New-password-1234"),
+    resetPassword(resetToken, "Other-password-5678"),
+  ]);
+  check(
+    "a password-reset token can be redeemed only once",
+    resetOutcomes.filter((outcome) => outcome.ok).length === 1,
+  );
   await db.insert(zones).values(
     Array.from({ length: seededZones }, (_, index) => ({
       ownerId: quotaOwner.id,
@@ -319,6 +348,14 @@ async function main() {
     mollieCustomerId: "cst_bench",
     status: "pending",
   });
+  await db.insert(subscriptions).values({
+    ownerId: renewalOwner.id,
+    mollieCustomerId: "cst_renewal_bench",
+    mollieSubscriptionId: "sub_renewal_bench",
+    status: "suspended",
+    currentPeriodStart: new Date("2026-01-01T10:20:30.000Z"),
+    currentPeriodEnd: new Date("2026-02-01T10:20:30.000Z"),
+  });
   const realFetch = globalThis.fetch;
   const realAppUrl = process.env.APP_URL;
   const realMollieKey = process.env.MOLLIE_API_KEY;
@@ -329,6 +366,20 @@ async function main() {
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url.includes("/payments/")) {
+      if (url.endsWith("tr_renewal_new") || url.endsWith("tr_renewal_old")) {
+        const isNew = url.endsWith("tr_renewal_new");
+        return Response.json({
+          id: isNew ? "tr_renewal_new" : "tr_renewal_old",
+          status: "paid",
+          paidAt: isNew
+            ? "2026-01-31T10:20:30.000Z"
+            : "2026-01-15T10:20:30.000Z",
+          customerId: "cst_renewal_bench",
+          subscriptionId: "sub_renewal_bench",
+          sequenceType: "recurring",
+          metadata: { ownerId: renewalOwner.id },
+        });
+      }
       return Response.json({
         id: url.endsWith("tr_bench_one") ? "tr_bench_one" : "tr_bench_two",
         status: "authorized",
@@ -363,6 +414,8 @@ async function main() {
       applyMolliePayment("tr_bench_one"),
       applyMolliePayment("tr_bench_two"),
     ]);
+    await applyMolliePayment("tr_renewal_new");
+    await applyMolliePayment("tr_renewal_old");
   } finally {
     globalThis.fetch = realFetch;
     if (realAppUrl === undefined) delete process.env.APP_URL;
@@ -380,6 +433,19 @@ async function main() {
     "concurrent mandate webhooks create one Mollie subscription",
     subscriptionCreates === 1 && billingRow?.subscriptionId === "sub_bench_1",
     `${subscriptionCreates} created`,
+  );
+  const [renewalRow] = await db
+    .select({
+      periodStart: subscriptions.currentPeriodStart,
+      periodEnd: subscriptions.currentPeriodEnd,
+    })
+    .from(subscriptions)
+    .where(eq(subscriptions.ownerId, renewalOwner.id))
+    .limit(1);
+  check(
+    "renewals clamp month-end and ignore delayed older payments",
+    renewalRow?.periodStart?.toISOString() === "2026-01-31T10:20:30.000Z" &&
+      renewalRow.periodEnd?.toISOString() === "2026-02-28T10:20:30.000Z",
   );
 
   // Google's 30-day deadline. Driven by READS, so no enrichment run is needed:
@@ -481,7 +547,8 @@ async function main() {
   );
   check(
     "an unreadable amount is refused, never NaN",
-    unreadable.status === "error" && unreadable.message === "Unreadable amount.",
+    unreadable.status === "error" &&
+      unreadable.message === "Unreadable amount.",
     unreadable.message ?? "",
   );
   check(
@@ -497,7 +564,8 @@ async function main() {
   );
   check(
     "a capture at 0 € is refused: it is a take, not a gift",
-    zeroAmount.status === "error" && zeroAmount.fieldErrors.amount !== undefined,
+    zeroAmount.status === "error" &&
+      zeroAmount.fieldErrors.amount !== undefined,
     zeroAmount.message ?? "",
   );
 
@@ -618,7 +686,10 @@ async function main() {
     occurredAt: sameInstant,
   });
 
-  const undoWithdrawal = await rollbackTargetAction(IDLE, form({ id: wonTarget }));
+  const undoWithdrawal = await rollbackTargetAction(
+    IDLE,
+    form({ id: wonTarget }),
+  );
   const wonRow = await readTarget(wonTarget);
   check(
     "undoing a withdrawal lands on TAKEN, not on the start",
@@ -647,11 +718,13 @@ async function main() {
     targetId: spottedOnly,
     kind: "survey",
   });
-  const undoSurvey = await rollbackTargetAction(IDLE, form({ id: spottedOnly }));
+  const undoSurvey = await rollbackTargetAction(
+    IDLE,
+    form({ id: spottedOnly }),
+  );
   check(
     "a spotting cannot be undone: it really was found",
-    undoSurvey.status === "error" &&
-      (await ledgerOf(spottedOnly)).length === 1,
+    undoSurvey.status === "error" && (await ledgerOf(spottedOnly)).length === 1,
     undoSurvey.message ?? "",
   );
 
@@ -670,7 +743,10 @@ async function main() {
 
   // Idempotence: a double click must double nothing.
 
-  const twice = await advanceTargetAction(IDLE, form({ id: flow, to: "studied" }));
+  const twice = await advanceTargetAction(
+    IDLE,
+    form({ id: flow, to: "studied" }),
+  );
   check(
     "advancing to the same step twice is refused",
     twice.status === "error" &&
@@ -710,7 +786,8 @@ async function main() {
   const setAside = await dismissTargetAction(IDLE, form({ id: flow }));
   check(
     "setting aside takes a business out of play",
-    setAside.status === "success" && (await readTarget(flow)).state === "dismissed",
+    setAside.status === "success" &&
+      (await readTarget(flow)).state === "dismissed",
     setAside.message ?? "",
   );
 
@@ -743,7 +820,8 @@ async function main() {
   const restored = await restoreTargetAction(IDLE, form({ id: flow }));
   check(
     "restoring puts it back in the state its ledger justifies",
-    restored.status === "success" && (await readTarget(flow)).state === "studied",
+    restored.status === "success" &&
+      (await readTarget(flow)).state === "studied",
     restored.message ?? "",
   );
 
@@ -821,7 +899,10 @@ async function main() {
     "a typed phone remains, so the entry is still dated",
   );
 
-  await noteTargetFieldAction(IDLE, form({ id: noted, field: "phone", value: "" }));
+  await noteTargetFieldAction(
+    IDLE,
+    form({ id: noted, field: "phone", value: "" }),
+  );
   const clearedAll = await readTarget(noted);
   check(
     "clearing the phone empties manual_phone, and only it",
@@ -846,14 +927,26 @@ async function main() {
     "a guessed id is not enough",
   );
 
-  const stolenDismiss = await dismissTargetAction(IDLE, form({ id: strangerTarget }));
-  const stolenRestore = await restoreTargetAction(IDLE, form({ id: strangerTarget }));
-  const stolenUndo = await rollbackTargetAction(IDLE, form({ id: strangerTarget }));
+  const stolenDismiss = await dismissTargetAction(
+    IDLE,
+    form({ id: strangerTarget }),
+  );
+  const stolenRestore = await restoreTargetAction(
+    IDLE,
+    form({ id: strangerTarget }),
+  );
+  const stolenUndo = await rollbackTargetAction(
+    IDLE,
+    form({ id: strangerTarget }),
+  );
   const stolenNote = await noteTargetFieldAction(
     IDLE,
     form({ id: strangerTarget, field: "phone", value: "01 02 03 04 05" }),
   );
-  const stolenEnrich = await enrichTargetAction(IDLE, form({ id: strangerTarget }));
+  const stolenEnrich = await enrichTargetAction(
+    IDLE,
+    form({ id: strangerTarget }),
+  );
 
   check(
     "setting aside, restoring and undoing are refused too",
@@ -885,7 +978,8 @@ async function main() {
     .where(eq(zones.id, strangerZone));
   check(
     "renaming another owner's sector is refused",
-    stolenRename.status === "error" && strangerZoneRow?.label === "Stranger sector",
+    stolenRename.status === "error" &&
+      strangerZoneRow?.label === "Stranger sector",
     stolenRename.message ?? "",
   );
 
@@ -913,7 +1007,10 @@ async function main() {
     notAnId.fieldErrors.id ?? "no field error",
   );
 
-  const notAnIdDismiss = await dismissTargetAction(IDLE, form({ id: "../../etc" }));
+  const notAnIdDismiss = await dismissTargetAction(
+    IDLE,
+    form({ id: "../../etc" }),
+  );
   check(
     "…on every action taking an id",
     notAnIdDismiss.status === "error" &&
@@ -1032,7 +1129,10 @@ async function main() {
     enrichFrame.message?.slice(0, 46) ?? "",
   );
 
-  const enrichBadFrame = await enrichZoneAction(IDLE, form({ frame: "not json" }));
+  const enrichBadFrame = await enrichZoneAction(
+    IDLE,
+    form({ frame: "not json" }),
+  );
   check(
     "an unreadable frame is refused before the key is even read",
     enrichBadFrame.status === "error" &&
@@ -1119,7 +1219,10 @@ async function main() {
 
   process.env.ALLOW_SIGNUPS = "true";
 
-  const noEmail = await signInAction(INITIAL_SIGNIN_STATE, form({ password: "x" }));
+  const noEmail = await signInAction(
+    INITIAL_SIGNIN_STATE,
+    form({ password: "x" }),
+  );
   check(
     "signing in with no address is refused",
     noEmail.error !== null,
@@ -1128,15 +1231,22 @@ async function main() {
 
   const unknownAccount = await signInAction(
     INITIAL_SIGNIN_STATE,
-    form({ email: "bench-actions-nobody@towncenter.test", password: "wrong-one-here" }),
+    form({
+      email: "bench-actions-nobody@towncenter.test",
+      password: "wrong-one-here",
+    }),
   );
   const wrongPassword = await signInAction(
     INITIAL_SIGNIN_STATE,
-    form({ email: "bench-actions-actor@towncenter.test", password: "wrong-one-here" }),
+    form({
+      email: "bench-actions-actor@towncenter.test",
+      password: "wrong-one-here",
+    }),
   );
   check(
     "an unknown address and a wrong password get the SAME refusal",
-    unknownAccount.error === wrongPassword.error && wrongPassword.error !== null,
+    unknownAccount.error === wrongPassword.error &&
+      wrongPassword.error !== null,
     wrongPassword.error ?? "",
   );
 
@@ -1163,7 +1273,10 @@ async function main() {
   process.env.ALLOW_SIGNUPS = "";
   const closed = await signUpAction(
     INITIAL_SIGNUP_STATE,
-    form({ email: "bench-actions-late@towncenter.test", password: "street-by-street-1789" }),
+    form({
+      email: "bench-actions-late@towncenter.test",
+      password: "street-by-street-1789",
+    }),
   );
   check(
     "the action re-checks the signup gate the page already hid",
@@ -1177,8 +1290,8 @@ async function main() {
     .where(sql`${users.email} like ${EMAIL_LIKE}`);
   check(
     "no account was created by any of those refusals",
-    Number(strayAccounts?.total) === 3,
-    `${strayAccounts?.total} accounts, the three seeded`,
+    Number(strayAccounts?.total) === 5,
+    `${strayAccounts?.total} accounts, the five seeded`,
   );
 
   let termsRequired = false;
@@ -1204,17 +1317,55 @@ async function main() {
 
   try {
     const guarded: readonly [string, () => Promise<unknown>][] = [
-      ["harvestZoneAction", () => harvestZoneAction(IDLE, form({ frame: JSON.stringify(FRAME) }))],
-      ["enrichZoneAction", () => enrichZoneAction(IDLE, form({ frame: JSON.stringify(FRAME) }))],
-      ["enrichTargetAction", () => enrichTargetAction(IDLE, form({ id: noted }))],
-      ["noteTargetFieldAction", () => noteTargetFieldAction(IDLE, form({ id: noted, field: "phone", value: "06" }))],
-      ["advanceTargetAction", () => advanceTargetAction(IDLE, form({ id: flow, to: "engaged" }))],
-      ["rollbackTargetAction", () => rollbackTargetAction(IDLE, form({ id: flow }))],
-      ["dismissTargetAction", () => dismissTargetAction(IDLE, form({ id: flow }))],
-      ["restoreTargetAction", () => restoreTargetAction(IDLE, form({ id: flow }))],
-      ["renameZoneAction", () => renameZoneAction(IDLE, form({ id: zone, label: "Nope" }))],
-      ["savePriceGridAction", () => savePriceGridAction(INITIAL_PRICE_GRID_STATE, gridForm(savedGrid))],
-      ["resetPriceGridAction", () => resetPriceGridAction(INITIAL_PRICE_GRID_STATE, form({}))],
+      [
+        "harvestZoneAction",
+        () => harvestZoneAction(IDLE, form({ frame: JSON.stringify(FRAME) })),
+      ],
+      [
+        "enrichZoneAction",
+        () => enrichZoneAction(IDLE, form({ frame: JSON.stringify(FRAME) })),
+      ],
+      [
+        "enrichTargetAction",
+        () => enrichTargetAction(IDLE, form({ id: noted })),
+      ],
+      [
+        "noteTargetFieldAction",
+        () =>
+          noteTargetFieldAction(
+            IDLE,
+            form({ id: noted, field: "phone", value: "06" }),
+          ),
+      ],
+      [
+        "advanceTargetAction",
+        () => advanceTargetAction(IDLE, form({ id: flow, to: "engaged" })),
+      ],
+      [
+        "rollbackTargetAction",
+        () => rollbackTargetAction(IDLE, form({ id: flow })),
+      ],
+      [
+        "dismissTargetAction",
+        () => dismissTargetAction(IDLE, form({ id: flow })),
+      ],
+      [
+        "restoreTargetAction",
+        () => restoreTargetAction(IDLE, form({ id: flow })),
+      ],
+      [
+        "renameZoneAction",
+        () => renameZoneAction(IDLE, form({ id: zone, label: "Nope" })),
+      ],
+      [
+        "savePriceGridAction",
+        () =>
+          savePriceGridAction(INITIAL_PRICE_GRID_STATE, gridForm(savedGrid)),
+      ],
+      [
+        "resetPriceGridAction",
+        () => resetPriceGridAction(INITIAL_PRICE_GRID_STATE, form({})),
+      ],
     ];
 
     for (const [name, run] of guarded) {
@@ -1225,7 +1376,11 @@ async function main() {
         sentToTheDoor =
           error instanceof Error && error.message.includes("redirect(/login)");
       }
-      check(`${name} refuses without a session`, sentToTheDoor, "sent to /login");
+      check(
+        `${name} refuses without a session`,
+        sentToTheDoor,
+        "sent to /login",
+      );
     }
 
     let signedOut = false;

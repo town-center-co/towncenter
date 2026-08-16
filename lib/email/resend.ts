@@ -50,6 +50,14 @@ export async function sendEmail(
   content: EmailContent,
 ): Promise<boolean> {
   if (!emailEnabled()) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[email] disabled in production — skipped to=%s subject=%s",
+        to,
+        content.subject,
+      );
+      return false;
+    }
     console.log(
       "[email] disabled — would send to=%s subject=%s\n%s",
       to,

@@ -37,13 +37,11 @@ import {
   Difficulty,
   Badge,
   Fact,
-  SourceLegend,
   Source,
   Sources,
   percent,
   resistanceBand,
   Spinner,
-  type SourceKey,
 } from "@/components/ui";
 import { formatEuros } from "@/lib/format";
 import { PRICE_OFFER_LABELS } from "@/lib/scoring";
@@ -223,17 +221,6 @@ export function TargetSheet({
   const counting = countFields(groups);
   const main = primaryFields(groups);
 
-  // Only the sources this record actually cites. `sirene` and `computed` are
-  // always present; the others appear only if they supplied something, so the
-  // legend never implies Google answered when it never ran.
-  const citedSources: SourceKey[] = [
-    "sirene",
-    ...facts.flatMap((fact) => (fact.value === null ? [] : fact.sources)),
-    ...(target.manualWebsiteUrl || target.manualPhone ? (["log"] as const) : []),
-    ...(log.length > 0 ? (["log"] as const) : []),
-    "computed",
-  ];
-
   const inProgress =
     advancePending ||
     dismissPending ||
@@ -268,6 +255,9 @@ export function TargetSheet({
     }
   }, [noteState]);
 
+  const [calculationOpen, setCalculationOpen] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+
   // The sheet is not remounted between businesses, it is the same node with new
   // props, so every transient state has to be reset by hand.
   useEffect(() => {
@@ -276,17 +266,26 @@ export function TargetSheet({
     setInput(null);
     setEditing(null);
     setTab("approach");
+    setCalculationOpen(false);
+    setFieldsOpen(false);
   }, [target.id]);
 
   const calculationRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [highlightCalculation, setHighlightCalculation] = useState(false);
 
+  // `.sheet__body` is shared by all three tabs, so it keeps its scroll
+  // position across a switch unless reset here.
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [tab]);
+
   // Two passes are required: the calculation block is not in the DOM until the
   // Facts tab is mounted, so scrolling in the same tick would silently target a
   // missing node. Switch tab, raise a flag, scroll once the panel is painted.
   const openCalculation = useCallback(() => {
     setTab("facts");
+    setCalculationOpen(true);
     setHighlightCalculation(true);
   }, []);
 
@@ -488,7 +487,10 @@ export function TargetSheet({
     <aside className="sheet" aria-label={`Record for ${target.name}`}>
       <header className="sheet__head">
         <div className="sheet__head-top">
-          <p className="t-body-s tone-2">{target.lootReason}</p>
+          <h2 className="t-title-2 sheet__name">
+            {target.name}
+            <Source sourceKey="sirene" />
+          </h2>
           <Button
             variant="quiet"
             size="compact"
@@ -500,14 +502,10 @@ export function TargetSheet({
           </Button>
         </div>
 
-        <h2 className="t-title-2 sheet__name">
-          {target.name}
-          <Source sourceKey="sirene" />
-        </h2>
         <p className="t-body-s tone-2 sheet__address">
-          {[target.address, target.postalCode, target.city].filter(Boolean).join(" · ") ||
+          {target.address ||
+            [target.postalCode, target.city].filter(Boolean).join(" · ") ||
             "Address unknown"}
-          <Source sourceKey="sirene" />
         </p>
 
         {/* The two questions, side by side and nothing else. */}
@@ -595,11 +593,6 @@ export function TargetSheet({
             <Badge>{item.label}</Badge>
             {item.key === "log" && log.length > 0 ? (
               <span className="t-micro tnum sheet__tab-count">{log.length}</span>
-            ) : null}
-            {item.key === "facts" && counting.empty > 0 ? (
-              <span className="t-micro tnum sheet__tab-count">
-                {counting.filled}/{counting.total}
-              </span>
             ) : null}
           </button>
         ))}
@@ -903,7 +896,7 @@ export function TargetSheet({
                   arguments.
                 </p>
               ) : (
-                <ul className="sheet__neighbours">
+                <ul className="panel sheet__neighbours">
                   {neighbours.map((neighbour) => (
                     <li key={neighbour.id}>
                       <button
@@ -913,9 +906,9 @@ export function TargetSheet({
                         onClick={() => onSelect(neighbour.id)}
                       >
                         <span className="t-body sheet__neighbour-name">{neighbour.name}</span>
-                        <span className="t-body-s tone-2 tnum">
+                        <span className="t-body-s tone-2 tnum sheet__neighbour-stats">
                           {distance(neighbour.distanceMeters)} ·{" "}
-                          {formatEuros(neighbour.expectancyCents, { decimals: "never" })}
+                          {percent(neighbour.resistancePercent)}
                           {neighbour.state === "spotted"
                             ? ""
                             : ` · ${STATE_LABEL[neighbour.state]}`}
@@ -931,8 +924,12 @@ export function TargetSheet({
                 details, no stale Google fact, calibration stated. Nothing is
                 composed here. */}
             <div className="sheet__tools">
+              <p className="t-body-s tone-2">
+                For prep before a call: identity, spoils, the five facts, the
+                neighbours and the log, as one brief for any AI assistant.
+              </p>
               <Button
-                variant="quiet"
+                variant="secondary"
                 size="compact"
                 className="sheet__copy"
                 onClick={() => {
@@ -945,9 +942,8 @@ export function TargetSheet({
 
             {copied === "fact" ? (
               <p className="t-body-s tone-2" role="status">
-                The Markdown brief is on the clipboard: identity, spoils, the five facts,
-                the product of factors, the neighbours and the log. No personal contact
-                details for any director are included.
+                On the clipboard. No personal contact details for any director are
+                included.
               </p>
             ) : null}
 
@@ -1022,11 +1018,14 @@ export function TargetSheet({
               </div>
 
               {/* The tail is folded, not dropped. Native `<details>`: no React
-                  state, and browser find (Cmd-F) opens it on its own. The
-                  counts are in the summary. */}
-              <details className="sheet__all">
+                  state drives the fold itself, and browser find (Cmd-F) opens
+                  it on its own. The counts are in the summary. */}
+              <details
+                className="sheet__all"
+                onToggle={(event) => setFieldsOpen(event.currentTarget.open)}
+              >
                 <summary className="t-body-s sheet__all-summary">
-                  {`All ${counting.total} fields · ${counting.filled} recorded · ${counting.empty} empty`}
+                  {`${fieldsOpen ? "Hide" : "Show"} all ${counting.total} fields · ${counting.filled} recorded · ${counting.empty} empty`}
                 </summary>
                 <div className="sheet__all-body">
                   {groups.map((group) => (
@@ -1041,69 +1040,68 @@ export function TargetSheet({
               </details>
             </section>
 
-            {/* The factor product, scrolled to from the head figure. */}
+            {/* The factor product, scrolled to and opened from the head figure. */}
             <section className="sheet__section" ref={calculationRef}>
               <div className="sheet__section-head">
                 <Badge asChild><h3>Where this figure comes from</h3></Badge>
                 {/* None of this was surveyed; all of it is derived. */}
                 <Sources keys={["computed"]} />
               </div>
-              <ul className="sheet__factors panel">
-                {success.factors.map((factor, index) => (
-                  <li
-                    key={`${factor.label}-${index}`}
-                    className="sheet__factor"
-                    data-weight={
-                      factor.value === 0
-                        ? "zero"
-                        : factor.value > 1
-                          ? "high"
-                          : factor.value < 1
-                            ? "low"
-                            : "neutral"
-                    }
-                  >
-                    <span className="t-body">{factor.label}</span>
-                    <span className="t-body tnum sheet__factor-value">
-                      {index === 0
-                        ? formatNumber(factor.value, 3)
-                        : `× ${formatNumber(factor.value, 2)}`}
-                    </span>
-                  </li>
-                ))}
-                {/* The raw product is ODDS, not resistance. Put next to a
-                    resistance percentage without naming which is which it reads
-                    as an error, so both rows spell out the conversion. */}
-                <li className="sheet__factor sheet__factor--total">
-                  <span className="t-body">
-                    {`Raw product ${formatNumber(success.rawProbability, 4)} odds, clamped then rounded to the nearest 5`}
-                  </span>
-                  <span className="t-body tnum">{percent(success.percent)}</span>
-                </li>
-                <li className="sheet__factor">
-                  <span className="t-body">
-                    {`Resistance = 100 − ${success.percent}, that is ${band.label}`}
-                  </span>
-                  <span className="t-title-3 tnum">
-                    {percent(target.resistancePercent)}
-                  </span>
-                </li>
-              </ul>
-              <p className="t-body-s tone-3">
-                {`The product is clamped between 2 % and 85 % odds before rounding: an estimate built on a handful of facts does not have three significant digits, and showing three would be a promise we cannot keep.`}
-              </p>
-            </section>
-
-            {/* A pictogram alone is a riddle: the legend carries the full name,
-                what the source provides, and its address when it has one. */}
-            <section className="sheet__section">
-              <Badge asChild><h3>Where all of this comes from</h3></Badge>
-              <SourceLegend keys={citedSources} className="panel" />
-              <p className="t-body-s tone-3">
-                Only the sources this record actually uses are listed. A missing one is
-                not a gap in the product: it is an enrichment that has not run, or a
-                fact nobody has written down yet.
-              </p>
+              <details
+                className="sheet__all"
+                open={calculationOpen}
+                onToggle={(event) => setCalculationOpen(event.currentTarget.open)}
+              >
+                <summary className="t-body-s sheet__all-summary">
+                  {calculationOpen ? "Hide the calculation" : "Show the calculation"}
+                </summary>
+                <div className="sheet__all-body">
+                  <ul className="sheet__factors panel">
+                    {success.factors.map((factor, index) => (
+                      <li
+                        key={`${factor.label}-${index}`}
+                        className="sheet__factor"
+                        data-weight={
+                          factor.value === 0
+                            ? "zero"
+                            : factor.value > 1
+                              ? "high"
+                              : factor.value < 1
+                                ? "low"
+                                : "neutral"
+                        }
+                      >
+                        <span className="t-body">{factor.label}</span>
+                        <span className="t-body tnum sheet__factor-value">
+                          {index === 0
+                            ? formatNumber(factor.value, 3)
+                            : `× ${formatNumber(factor.value, 2)}`}
+                        </span>
+                      </li>
+                    ))}
+                    {/* The raw product is ODDS, not resistance. Put next to a
+                        resistance percentage without naming which is which it reads
+                        as an error, so both rows spell out the conversion. */}
+                    <li className="sheet__factor sheet__factor--total">
+                      <span className="t-body">
+                        {`Raw product ${formatNumber(success.rawProbability, 4)} odds, clamped then rounded to the nearest 5`}
+                      </span>
+                      <span className="t-body tnum">{percent(success.percent)}</span>
+                    </li>
+                    <li className="sheet__factor">
+                      <span className="t-body">
+                        {`Resistance = 100 − ${success.percent}, that is ${band.label}`}
+                      </span>
+                      <span className="t-title-3 tnum">
+                        {percent(target.resistancePercent)}
+                      </span>
+                    </li>
+                  </ul>
+                  <p className="t-body-s tone-3">
+                    {`The product is clamped between 2 % and 85 % odds before rounding: an estimate built on a handful of facts does not have three significant digits, and showing three would be a promise we cannot keep.`}
+                  </p>
+                </div>
+              </details>
             </section>
           </div>
         ) : null}

@@ -57,14 +57,12 @@ export { Fact, type FactProps } from "./Fact";
 export {
   Source,
   Sources,
-  SourceLegend,
   SOURCES,
   SOURCE_ORDER,
   type SourceKey,
   type SourceEntry,
   type SourceProps,
   type SourcesProps,
-  type SourceLegendProps,
 } from "./Source";
 export { Hold, type HoldProps } from "./Hold";
 export { Stamp, type StampProps } from "./Stamp";

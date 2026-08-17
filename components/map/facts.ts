@@ -478,9 +478,7 @@ function access(target: TargetRow): TargetFact {
   }
 
   parts.push(target.address ? 100 : 0);
-  if (target.address) {
-    verbatim.push([target.address, target.postalCode, target.city].filter(Boolean).join(" · "));
-  }
+  if (target.address) verbatim.push(target.address);
 
   return {
     ...base,

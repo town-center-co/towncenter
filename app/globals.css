@@ -1337,20 +1337,6 @@ table,
   overflow-wrap: anywhere;
 }
 
-.fact__source {
-  color: var(--text-2);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-}
-
-/* In a source row the badge opens the line, so it drops the inline margin that
-   separates it from preceding text. */
-.fact__source .sources {
-  margin-inline-start: 0;
-}
-
 .fact__stale {
   color: var(--text-2);
   font-style: italic;
@@ -1388,6 +1374,17 @@ table,
      convention rather than as ornaments. */
   font-size: 0.8125rem;
   line-height: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.source:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-1);
 }
 
 .source svg {
@@ -1421,57 +1418,63 @@ li:hover .source,
   margin-inline-start: 0;
 }
 
-/* --- The legend ---------------------------------------------------------- */
+/* --- The popover ---------------------------------------------------------- */
 
-.source-legend {
-  list-style: none;
-  margin: 0;
+.source-popover {
+  z-index: 60;
+  width: max-content;
+  max-width: min(280px, calc(100vw - var(--space-4)));
   padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.source-legend__row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-/* Here, and only here, the badge is the subject of the row: it takes the
-   current text colour and a fixed gutter so the five pictograms line up
-   vertically whatever their name. */
-.source-legend__row > .source {
-  margin-inline-start: 0;
-  color: var(--text-1);
-  flex: 0 0 auto;
-  inline-size: 1.1rem;
-  justify-content: center;
-  translate: 0 0.15em;
-}
-
-.source-legend__row > .source svg {
-  inline-size: 1.05rem;
-  block-size: 1.05rem;
-  translate: 0;
-}
-
-.source-legend__body {
+  padding-inline-end: calc(var(--space-3) + 1.5rem);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-2);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
 
-.source-legend__name {
+.source-popover__close {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: none;
+  border-radius: var(--radius-1);
+  background: none;
+  color: var(--text-3);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.source-popover__close:hover,
+.source-popover__close:focus-visible {
+  color: var(--text-1);
+  background: var(--surface-2);
+}
+
+.source-popover__name {
   color: var(--text-1);
   font-weight: 600;
 }
 
-.source-legend__what {
+.source-popover__name a {
+  color: inherit;
+}
+
+.source-popover__what {
   color: var(--text-2);
+  margin: 0;
   overflow-wrap: anywhere;
+}
+
+.source-popover__arrow {
+  fill: var(--surface-1);
 }
 
 /* Below 320 px of CONTAINER — not viewport — the name moves above the bar.

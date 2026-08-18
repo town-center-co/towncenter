@@ -581,6 +581,11 @@
   border-color: color-mix(in oklch, var(--accent) 42%, transparent);
 }
 
+/* `aria-disabled` keeps the locked control clickable so its explanation remains reachable. */
+.map__control[data-locked] {
+  color: var(--text-3);
+}
+
 /* Only the draw control carries a persistent state; the other two open
    something and close it again. */
 .map__control[aria-pressed="true"] {

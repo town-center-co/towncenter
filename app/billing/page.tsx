@@ -51,6 +51,7 @@ export default async function BillingPage(props: PageProps<"/billing">) {
   const params = await props.searchParams;
   const error = first(params.error);
   const canceled = first(params.canceled);
+  const fromOnboarding = first(params.from) === "onboarding";
   const notice = error
     ? NOTICES[`error:${error}`]
     : canceled
@@ -63,8 +64,13 @@ export default async function BillingPage(props: PageProps<"/billing">) {
         <Badge asChild>
           <h2>{t("title")}</h2>
         </Badge>
-        <Link className={`t-body-s ${styles.back}`} href={"/" as Route}>
-          {shared("SettingsPage.backToMap")}
+        <Link
+          className={`t-body-s ${styles.back}`}
+          href={(fromOnboarding ? "/onboarding" : "/") as Route}
+        >
+          {fromOnboarding
+            ? t("backToOnboarding")
+            : shared("SettingsPage.backToMap")}
         </Link>
       </header>
 
@@ -74,7 +80,16 @@ export default async function BillingPage(props: PageProps<"/billing">) {
         </p>
       ) : null}
 
-      {facts.enabled ? <SaasBilling facts={facts} t={t} shared={shared} /> : <SelfHosted t={t} />}
+      {facts.enabled ? (
+        <SaasBilling
+          facts={facts}
+          fromOnboarding={fromOnboarding}
+          t={t}
+          shared={shared}
+        />
+      ) : (
+        <SelfHosted t={t} />
+      )}
     </main>
   );
 }
@@ -128,7 +143,17 @@ function statusLine(facts: BillingFacts, t: T): string {
   }
 }
 
-function SaasBilling({ facts, t, shared }: { facts: BillingFacts; t: T; shared: T }) {
+function SaasBilling({
+  facts,
+  fromOnboarding,
+  t,
+  shared,
+}: {
+  facts: BillingFacts;
+  fromOnboarding: boolean;
+  t: T;
+  shared: T;
+}) {
   const canSubscribe = facts.state === "none" || facts.state === "expired";
   const canCancel =
     facts.status === "active" &&
@@ -178,6 +203,10 @@ function SaasBilling({ facts, t, shared }: { facts: BillingFacts; t: T; shared: 
         <div className={styles.actions}>
           {canSubscribe ? (
             <form action={subscribeAction}>
+              {/* Preserve the onboarding return path if checkout setup fails. */}
+              {fromOnboarding ? (
+                <input type="hidden" name="from" value="onboarding" />
+              ) : null}
               <label className={styles.acceptance}>
                 <input name="terms" type="checkbox" value="accepted" required />
                 <span>

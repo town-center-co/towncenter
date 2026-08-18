@@ -12,7 +12,7 @@ import {
 } from "@/lib/settings";
 import type { ScoringFacts } from "@/lib/types";
 
-import { getPriceGrid } from "../queries";
+import { getPriceGrid, hasCustomPriceGrid } from "../queries";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { PlacesKeyForm } from "./PlacesKeyForm";
 import { removePlacesKeyAction } from "./actions";
@@ -158,14 +158,24 @@ async function ApiKeySection({ ownerId }: { ownerId: string }) {
   );
 }
 
-export default async function SettingsPage() {
+function first(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+export default async function SettingsPage(props: PageProps<"/settings">) {
   const owner = await requireUser();
-  const [grid, t, tWitnesses] = await Promise.all([
+  const [grid, hasSavedGrid, t, tWitnesses, params] = await Promise.all([
     getPriceGrid(owner),
+    hasCustomPriceGrid(owner),
     getTranslations("SettingsPage"),
     getTranslations("Witnesses"),
+    props.searchParams,
   ]);
   const locale = await getAccountLocale(owner.id);
+  const fromOnboarding = first(params.from) === "onboarding";
+  const leaveTo = (fromOnboarding ? "/onboarding" : "/") as Route;
+  const leaveLabel = fromOnboarding ? t("backToOnboarding") : t("backToMap");
 
   return (
     <main className="pricing">
@@ -173,8 +183,8 @@ export default async function SettingsPage() {
         <Badge asChild><h2>{t("title")}</h2></Badge>
         <div className="pricing__head-act">
           <LocaleSwitcher value={locale} />
-          <Link className="t-body-s pricing__back" href={"/" as Route}>
-            {t("backToMap")}
+          <Link className="t-body-s pricing__back" href={leaveTo}>
+            {leaveLabel}
           </Link>
         </div>
       </header>
@@ -193,7 +203,13 @@ export default async function SettingsPage() {
         </div>
       </header>
 
-      <PriceGridForm grid={grid} witnesses={witnesses(tWitnesses)} />
+      <PriceGridForm
+        grid={grid}
+        witnesses={witnesses(tWitnesses)}
+        hasSavedGrid={hasSavedGrid}
+        leaveTo={leaveTo}
+        leaveLabel={leaveLabel}
+      />
     </main>
   );
 }

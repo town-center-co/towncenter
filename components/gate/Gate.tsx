@@ -12,6 +12,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
+import { ThemeToggle } from "@/components/ui";
+
 import { WorldMap } from "./WorldMap";
 import townCentre from "./towncenter.png";
 
@@ -35,10 +37,13 @@ export async function Gate({ title, subtitle, children, toggle }: GateProps) {
     <main className={styles.frame}>
       <div className={styles.gate}>
         <div className={styles.column}>
-          <Link href="/login" className={styles.brand} aria-label="Towncenter">
-            <BrandMark />
-            Towncenter
-          </Link>
+          <div className={styles.top}>
+            <Link href="/login" className={styles.brand} aria-label="Towncenter">
+              <BrandMark />
+              Towncenter
+            </Link>
+            <ThemeToggle />
+          </div>
 
           <div className={styles.center}>
             <h1 className={styles.title}>{title}</h1>

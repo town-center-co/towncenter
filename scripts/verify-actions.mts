@@ -32,11 +32,11 @@ import { INITIAL_SIGNIN_STATE, INITIAL_SIGNUP_STATE } from "@/app/login/state";
 import {
   resetPriceGridAction,
   savePriceGridAction,
-} from "@/app/pricing/actions";
+} from "@/app/settings/actions";
 import {
   INITIAL_PRICE_GRID_STATE,
   type PriceGridState,
-} from "@/app/pricing/state";
+} from "@/app/settings/state";
 import { getPriceGrid, getTargetDetail, getTargetRow } from "@/app/queries";
 import type { Account } from "@/lib/accounts";
 import { getSession } from "@/lib/auth";
@@ -1154,7 +1154,7 @@ async function main() {
 
   const savedGrid: PriceGrid = {
     ...DEFAULT_PRICE_GRID,
-    fullSiteCents: DEFAULT_PRICE_GRID.fullSiteCents * 2,
+    fullSiteCents: DEFAULT_PRICE_GRID.fullSiteCents + 50_000,
   };
   const gridFields = gridForm(savedGrid);
   // typed by hand, with the narrow no-break space and a comma
@@ -1282,7 +1282,7 @@ async function main() {
   );
   check(
     "the action re-checks the signup gate the page already hid",
-    (closed.error ?? "").includes("not accepting new accounts"),
+    (closed.error ?? "").includes("ALLOW_SIGNUPS=true"),
     closed.error ?? "",
   );
 

@@ -59,6 +59,7 @@ import {
 } from "@/components/ui";
 import { AccountMenu } from "@/components/gate/Account";
 import type { Account } from "@/lib/accounts";
+import { TRIAL_DAYS } from "@/lib/billing/plans";
 import { formatEuros } from "@/lib/format";
 import { areaKm2, normalizeBbox } from "@/lib/geo";
 import {
@@ -738,6 +739,10 @@ export type TerritoryMapProps = {
   detail: TargetDetail | null;
   /** Cumulative area already surveyed this month. null = self-hosted, no limit. */
   cumulativeAreaKm2: { km2: number; maxKm2: number } | null;
+  /** The server-side billing reason that locks surveying. */
+  billingGate: "none" | "expired" | null;
+  /** True on the landing after /billing/return: the checkout just completed. */
+  billingStarted: boolean;
   /** The queryable activities, with their French NAF labels. */
   naf: readonly NafOption[];
   defaultNaf: readonly string[];
@@ -761,6 +766,8 @@ export function TerritoryMap({
   standardDealCents,
   detail,
   cumulativeAreaKm2,
+  billingGate,
+  billingStarted,
   naf,
   defaultNaf,
   fichesParPage,
@@ -792,6 +799,27 @@ export function TerritoryMap({
   const [drawMode, setDrawMode] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [drawRefusal, setDrawRefusal] = useState<string | null>(null);
+
+  // Billing refusal opens an explanation instead of arming the drawing gesture.
+  const surveyLocked = billingGate !== null;
+  const [lockNotice, setLockNotice] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!billingStarted) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("billing");
+    window.history.replaceState(null, "", url);
+  }, [billingStarted]);
+
+  const armDraw = useCallback(() => {
+    if (surveyLocked) {
+      setLockNotice(true);
+      return;
+    }
+    setDrawRefusal(null);
+    setDrawMode((mode) => !mode);
+  }, [surveyLocked]);
 
   // The sector being surveyed, and its name. It outlives the drawing gesture:
   // otherwise the rectangle vanishes on mouse-up and nothing says WHERE the
@@ -1630,8 +1658,8 @@ export function TerritoryMap({
             drawMode={drawMode}
             inProgress={ghostSector}
             onDraw={() => {
-              setDrawRefusal(null);
-              setDrawMode((mode) => !mode);
+              armDraw();
+              // The rail would cover the billing explanation panel.
               setRailOpen(false);
             }}
             onGoTo={(bbox) => {
@@ -1790,8 +1818,7 @@ export function TerritoryMap({
                     </Link>
                   </DropdownMenuItem>
 
-                  {/* Only on the hosted service: self-hosted has no plan to
-                      manage, and the quota prop is its own billing switch. */}
+                  {/* Only the hosted service has a billing plan to manage. */}
                   {cumulativeAreaKm2 !== null ? (
                     <DropdownMenuItem asChild>
                       <Link href={"/billing" as Route}>{t("billingLink")}</Link>
@@ -1819,11 +1846,16 @@ export function TerritoryMap({
                 type="button"
                 className="map__control tooltip tooltip--left"
                 aria-pressed={drawMode}
-                aria-label={drawMode ? t("cancelDrawingAria") : t("drawSectorAria")}
-                onClick={() => {
-                  setDrawRefusal(null);
-                  setDrawMode((mode) => !mode);
-                }}
+                aria-disabled={surveyLocked || undefined}
+                data-locked={surveyLocked ? "" : undefined}
+                aria-label={
+                  surveyLocked
+                    ? t("surveyingLockedAria")
+                    : drawMode
+                      ? t("cancelDrawingAria")
+                      : t("drawSectorAria")
+                }
+                onClick={armDraw}
               >
                 <DrawIcon />
               </button>
@@ -1912,6 +1944,51 @@ export function TerritoryMap({
               </div>
             ) : null}
           </div>
+
+          {/* The drawing control opens this refusal; the map never opens it itself. */}
+          {surveyLocked && lockNotice ? (
+            <div className="map__work panel" role="status">
+              <Badge asChild><h3>{t("surveyingLocked")}</h3></Badge>
+              <p className="t-body">
+                {billingGate === "expired"
+                  ? t("surveyingExpired")
+                  : t("surveyingTrial", { days: TRIAL_DAYS })}
+              </p>
+              <div className="map__work-actions">
+                <Button variant="primary" size="compact" asChild>
+                  <Link href={"/billing" as Route}>
+                    {billingGate === "expired"
+                      ? t("subscribe")
+                      : t("startFreeTrial")}
+                  </Link>
+                </Button>
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  onClick={() => setLockNotice(false)}
+                >
+                  {t("notNow")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Show the completed checkout confirmation once. */}
+          {billingStarted && !surveyLocked && !welcomeDismissed ? (
+            <div className="map__work panel" role="status">
+              <Badge asChild><h3>{t("paymentConfirmed")}</h3></Badge>
+              <p className="t-body">{t("paymentConfirmedBody")}</p>
+              <div className="map__work-actions">
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  onClick={() => setWelcomeDismissed(true)}
+                >
+                  {t("gotIt")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           {surveyRun || surveyPending || (surveyState.message && !surveyDismissed) ? (
             <div className="map__work panel" role="status" aria-live="polite">

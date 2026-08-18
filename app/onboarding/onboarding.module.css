@@ -193,6 +193,18 @@
   animation: stepEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* The payment confirmation, shown once when /billing/return lands back here. */
+.notice {
+  margin: 0 0 18px;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--success) 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--success) 7%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--success-text);
+}
+
 .stepActions {
   display: grid;
   gap: 12px;

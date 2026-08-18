@@ -17,6 +17,7 @@ import {
 } from "@/app/queries";
 import { TerritoryMap, type NafOption } from "@/components/map/TerritoryMap";
 import { requireUser } from "@/lib/accounts";
+import { getBillingState } from "@/lib/billing/subscriptions";
 import { DEFAULT_FRAME, frameToText, textToFrame } from "@/components/map/frame";
 import { parseView } from "@/components/map/view";
 import { unionBbox } from "@/lib/geo";
@@ -91,6 +92,7 @@ export default async function Page(props: PageProps<"/">) {
     grid,
     detail,
     cumulativeArea,
+    billing,
   ] = await Promise.all([
     listTargetsInBbox(owner, frame, {
       sort: view.sort,
@@ -107,7 +109,18 @@ export default async function Page(props: PageProps<"/">) {
     process.env.MOLLIE_API_KEY
       ? getCumulativeAreaKm2(owner)
       : Promise.resolve(null),
+    // Avoids a billing read on self-hosted instances.
+    getBillingState(owner.id),
   ]);
+
+  // Match the server-side billing refusal before drawing starts.
+  const billingGate =
+    billing.state === "none" || billing.state === "expired"
+      ? billing.state
+      : null;
+
+  // Set by /billing/return after checkout completes.
+  const billingStarted = first(params.billing) === "started";
 
   // clustered in TypeScript, not SQL: the grouping depends on the expected
   // value, which is recomputed on read and exists in no column.
@@ -131,6 +144,8 @@ export default async function Page(props: PageProps<"/">) {
         standardDealCents={standardDealCents(grid)}
         detail={detail}
         cumulativeAreaKm2={cumulativeArea}
+        billingGate={billingGate}
+        billingStarted={billingStarted}
         naf={NAF}
         defaultNaf={DEFAULT_NAF}
         fichesParPage={SIRENE_MAX_PER_PAGE}

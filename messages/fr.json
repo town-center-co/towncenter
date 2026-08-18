@@ -7,6 +7,7 @@
   "SettingsPage": {
     "title": "Paramètres",
     "backToMap": "Retour à la carte",
+    "backToOnboarding": "Retour à la configuration",
     "grid": "Grille de valeur des contrats"
   },
   "ApiKeySection": {
@@ -133,6 +134,7 @@
     "title": "Configurez votre territoire",
     "subtitleSaas": "Deux choses à faire avant que la carte ne devienne utile, et un plan à choisir. Chaque étape s’appuie sur un fait mesuré — passez-en une et revenez-y plus tard.",
     "subtitleSelfHosted": "Trois choses à faire avant que la carte ne devienne utile. Chacune s’appuie sur un fait mesuré — passez une étape et revenez-y plus tard.",
+    "paymentConfirmed": "Paiement confirmé — votre essai gratuit est en cours. Rien n’est facturé avant son terme, et vous pouvez l’annuler à tout moment depuis l’écran Facturation.",
     "stepConnectPlaces": "Connecter Google Places",
     "stepReviewGrid": "Vérifier votre grille de prix",
     "stepChoosePlan": "Choisir un plan",
@@ -156,7 +158,8 @@
     "limitZoneArea": "{count} km² par zone",
     "billingNotice": "La facturation est gérée par Mollie. Annulez à tout moment — vos données vous appartiennent et restent exportables.",
     "startTrial": "Démarrer l’essai gratuit",
-    "decideLater": "Je déciderai plus tard →",
+    "planRunning": "Votre essai ou abonnement est en cours — la prospection est déverrouillée. Gérez-le ou annulez-le à tout moment depuis l’écran Facturation.",
+    "manageSubscription": "Gérer l’abonnement",
     "sectorTitle": "Premier secteur",
     "sectorBody": "Dessinez un secteur sur la carte. Il se remplit avec chaque entreprise réellement enregistrée à cet endroit — le registre national des entreprises les connaît, et il est gratuit et sans clé. Chacune devient une cible portant deux nombres : le butin et la résistance.",
     "sectorSurveyed": "Vous avez déjà prospecté {count, plural, one {# secteur} other {# secteurs}}.",
@@ -164,6 +167,7 @@
   },
   "BillingPage": {
     "title": "Facturation",
+    "backToOnboarding": "Retour à la configuration",
     "noticeCheckoutError": "Le paiement n’a pas pu être créé. Réessayez, ou revenez plus tard.",
     "noticeCancelError": "L’annulation n’a pas abouti. Réessayez, ou revenez plus tard.",
     "noticeTermsError": "Confirmez les conditions d’usage professionnel avant de démarrer l’essai.",
@@ -197,6 +201,17 @@
     "cancelSubscription": "Annuler l’abonnement",
     "cardRequiredNotice": "Une carte est requise pour démarrer l’essai — 0,00 € aujourd’hui, et le premier paiement seulement une fois l’essai terminé. ",
     "paymentsNotice": "Les paiements sont gérés par Mollie. Annulez à tout moment — l’accès reste ouvert jusqu’à la fin de la période payée et vos données existantes restent consultables."
+  },
+  "BillingReturn": {
+    "title": "Paiement",
+    "backToMap": "Retour à la carte",
+    "confirmingTitle": "Confirmation de votre paiement",
+    "confirmingBody": "Mollie confirme le paiement — cela prend généralement quelques secondes. Rien à faire ici : l’application s’ouvre d’elle-même dès que la confirmation arrive.",
+    "cardRegisteredTitle": "Carte enregistrée",
+    "cardRegisteredBody": "Votre carte est enregistrée et le premier prélèvement est en cours — Mollie le confirme selon son propre calendrier, généralement sous quelques minutes. L’accès s’ouvrira automatiquement ; l’écran Facturation indique où il en est.",
+    "openBilling": "Ouvrir l’écran Facturation",
+    "noConfirmationTitle": "Pas encore de confirmation",
+    "noConfirmationBody": "Le paiement n’a pas encore été confirmé. Si vous avez terminé le paiement, la confirmation est peut-être simplement en retard — l’écran Facturation l’indiquera. Si vous l’avez annulé, rien n’a été facturé et vous pouvez recommencer depuis cet écran."
   },
   "Account": {
     "signOut": "Se déconnecter",
@@ -805,7 +820,8 @@
     "settingsAndAccountAria": "Paramètres et compte",
     "activityCodes": "Codes d’activité",
     "settingsLink": "Paramètres",
-    "billingLink": "Facturation",
+    "billingLink": "Facturation et abonnement",
+    "surveyingLockedAria": "Prospection verrouillée — démarrez depuis l’écran Facturation",
     "cancelDrawingAria": "Annuler le dessin (Échap)",
     "drawSectorAria": "Dessiner un secteur",
     "closeSidePanelAria": "Fermer le panneau latéral",
@@ -818,6 +834,15 @@
     "enriching": "Enrichissement…",
     "enrichThisFrame": "Enrichir cette vue",
     "enrichExplainer": "Google d’abord, puis l’audit de site interne. L’enrichissement nécessite une clé Google Places — ajoutez-en une dans Paramètres, ou définissez GOOGLE_PLACES_API_KEY. Google est la seule source d’adresse de site web, et l’audit n’a rien à lire sans elle. Cela ne fait avancer personne — cela ajoute seulement des faits.",
+    "surveyingLocked": "Prospection verrouillée",
+    "surveyingExpired": "Votre essai ou abonnement est terminé. Tout ce qui a déjà été prospecté reste consultable — abonnez-vous pour continuer.",
+    "surveyingTrial": "La prospection s’ouvre avec l’essai gratuit de {days} jours. Une carte est requise, rien n’est facturé aujourd’hui, et annuler avant le terme ne coûte rien.",
+    "subscribe": "S’abonner",
+    "startFreeTrial": "Démarrer l’essai gratuit",
+    "notNow": "Pas maintenant",
+    "paymentConfirmed": "Paiement confirmé",
+    "paymentConfirmedBody": "Votre essai ou abonnement est en cours — la carte est entièrement déverrouillée. Gérez-le ou annulez-le à tout moment depuis le menu, sous « Facturation et abonnement ».",
+    "gotIt": "Compris",
     "surveyRunning": "Prospection en cours",
     "survey": "Prospection",
     "pageOfEstimated": "Page {page} sur ~{estimated}",

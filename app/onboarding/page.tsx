@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/accounts";
 import { PRO_PLAN, TRIAL_DAYS } from "@/lib/billing/plans";
 import { MAX_ZONE_AREA_KM2 } from "@/lib/limits";
 import { getOnboardingFacts, type OnboardingFacts } from "@/app/queries";
+import { ConsumeBillingStarted } from "@/components/billing/ConsumeBillingStarted";
 import { Button, Badge, Card, CardHeader, CardTitle } from "@/components/ui";
 import { WorldMap } from "@/components/gate/WorldMap";
 import townCentre from "@/components/gate/towncenter.png";
@@ -35,6 +36,8 @@ const SAAS_STEPS = ["grid", "upgrade", "sector"] as const;
 function firstIncomplete(facts: OnboardingFacts): string {
   if (!facts.isSaaS && facts.placesKeySource === null) return "key";
   if (!facts.hasCustomGrid) return "grid";
+  // Billing must unlock surveying before the first sector.
+  if (facts.isSaaS && !facts.planChosen) return "upgrade";
   if (facts.sectorCount === 0) return "sector";
   return "sector";
 }
@@ -59,6 +62,7 @@ export default async function OnboardingPage(props: PageProps<"/onboarding">) {
   const t = await getTranslations("OnboardingPage");
   const gate = await getTranslations("Gate");
   const shared = await getTranslations();
+  const billingStarted = first(params.billing) === "started";
 
   return (
     <main className={styles.frame}>
@@ -81,6 +85,15 @@ export default async function OnboardingPage(props: PageProps<"/onboarding">) {
               {facts.isSaaS ? t("subtitleSaas") : t("subtitleSelfHosted")}
             </p>
 
+            {billingStarted ? (
+              <>
+                <ConsumeBillingStarted />
+                <p className={styles.notice} role="status">
+                  {t("paymentConfirmed")}
+                </p>
+              </>
+            ) : null}
+
             <StepRail facts={facts} current={step} t={t} />
 
             <div key={step} className={styles.stepContent}>
@@ -89,7 +102,7 @@ export default async function OnboardingPage(props: PageProps<"/onboarding">) {
               ) : step === "grid" ? (
                 <GridStep facts={facts} t={t} />
               ) : step === "upgrade" ? (
-                <UpgradeStep t={t} />
+                <UpgradeStep facts={facts} t={t} />
               ) : (
                 <SectorStep facts={facts} t={t} shared={shared} />
               )}
@@ -124,7 +137,7 @@ function stepsFor(facts: OnboardingFacts, t: T): StepMeta[] {
   }
   items.push({ key: "grid", label: t("stepReviewGrid"), done: facts.hasCustomGrid });
   if (facts.isSaaS) {
-    items.push({ key: "upgrade", label: t("stepChoosePlan"), done: false });
+    items.push({ key: "upgrade", label: t("stepChoosePlan"), done: facts.planChosen });
   }
   items.push({ key: "sector", label: t("stepSurveySector"), done: facts.sectorCount > 0 });
   return items;
@@ -234,10 +247,15 @@ function GridStep({ facts, t }: { facts: OnboardingFacts; t: T }) {
         <p className="t-body-s tone-2">{t("gridDefaultNotice")}</p>
       )}
       <div className={styles.stepActions}>
-        <Link href="/settings" className={styles.stepLink}>
+        <Link href="/settings?from=onboarding" className={styles.stepLink}>
           {t("openSettings")}
         </Link>
-        <Link href="/onboarding?step=sector" className={styles.stepLink}>
+        <Link
+          href={
+            facts.isSaaS ? "/onboarding?step=upgrade" : "/onboarding?step=sector"
+          }
+          className={styles.stepLink}
+        >
           {facts.hasCustomGrid ? t("continue") : t("keepDefaultGrid")}
         </Link>
       </div>
@@ -245,8 +263,26 @@ function GridStep({ facts, t }: { facts: OnboardingFacts; t: T }) {
   );
 }
 
-function UpgradeStep({ t }: { t: T }) {
+function UpgradeStep({ facts, t }: { facts: OnboardingFacts; t: T }) {
   const price = PRO_PLAN.priceCents / 100;
+
+  if (facts.planChosen) {
+    return (
+      <>
+        <Badge asChild><h2>{t("planTitle")}</h2></Badge>
+        <p className="t-body">{t("planRunning")}</p>
+        <div className={styles.stepActions}>
+          <Link href="/onboarding?step=sector" className={styles.stepLink}>
+            {t("continue")}
+          </Link>
+          <Link href="/billing?from=onboarding" className={styles.stepLink}>
+            {t("manageSubscription")}
+          </Link>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Badge asChild><h2>{t("planTitle")}</h2></Badge>
@@ -269,12 +305,9 @@ function UpgradeStep({ t }: { t: T }) {
       </Card>
       <p className="t-body-s tone-2">{t("billingNotice")}</p>
       <div className={styles.stepActions}>
-        <a className={styles.upgradeCta} href="/billing">
+        <a className={styles.upgradeCta} href="/billing?from=onboarding">
           {t("startTrial")}
         </a>
-        <Link href="/onboarding?step=sector" className={styles.stepLink}>
-          {t("decideLater")}
-        </Link>
       </div>
     </>
   );

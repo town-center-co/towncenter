@@ -118,12 +118,45 @@ a zero.
 
 ## Interface conventions
 
-**Interface in English, amounts and dates French-formatted.** Screens,
-buttons, price reasons, error messages and the prompt template are English.
-`lib/format.ts` is pinned to `fr-FR` / `Europe/Paris` and does not move — the
-locale is frozen so server and client renders produce the same string;
-changing it reopens a hydration mismatch on every amount. The only visible
-French words are proper nouns: streets, towns, trade names.
+**Every user-facing string goes through next-intl. Never a hardcoded
+literal.** `useTranslations` (client components) or `getTranslations` (server
+components and Server Actions), one namespace per component named after its
+own exported function, added to **both** `messages/en.json` and
+`messages/fr.json` in the same commit — a JSX text node, an `aria-label`, a
+`placeholder`, a toast, a validation message, a Server Action's returned
+error: all of it. This applies to code an AI assistant writes exactly as much
+as to a human's. The locale is a stored per-account preference
+(`accountSettings.locale`, switched on `/settings`) — there is no `[locale]`
+URL segment and there must not be one; see `i18n/request.ts` for how the
+locale is resolved per request.
+
+A pure module that a non-request context also reads — `scripts/*.mts`, or
+`components/map/prompt.ts`'s Markdown export, which is deliberately English
+regardless of the UI locale (see its own header comment) — takes its
+translator as an explicit parameter (built with `createTranslator` where no
+request exists) rather than calling `useTranslations`/`getTranslations`
+itself, which requires request context and throws without it.
+
+`lib/format.ts` is pinned to `fr-FR` / `Europe/Paris` and does not move
+regardless of UI language: the locale is frozen so server and client renders
+produce the same string (changing it reopens a hydration mismatch on every
+amount), and the underlying data — French addresses, business names — does
+not change with the viewer's language preference either. The only English
+that survives untranslated on purpose is a proper noun (`Google Places`) or an
+acronym (`HTTPS`).
+
+**Known debt, not a pattern to extend:** `lib/scoring.ts`, `lib/harvest.ts`
+and `app/actions.ts` still return hardcoded English messages. They are not
+converted because `scripts/verify-actions.mts` and `verify-scoring.mts`
+assert those messages verbatim (`.startsWith("Unreadable sector")`,
+`.includes("already at this step")`) and run outside any Next.js request,
+where next-intl cannot be called at all. Fixing it means giving every message
+a stable key and rewriting those assertions to check keys instead of English
+substrings — tracked as its own follow-up. Until then, do not add *new*
+hardcoded strings to those three files on the assumption the debt already
+covers it; thread a translator through explicitly instead (see
+`app/queries.ts`'s `listFront()`, which already does this for the same
+files' neighbourhood).
 
 **Keys are ASCII, labels are visible text, and the two never mix.** A key is a
 short, lowercase, space-free string: URL value, storage key, `data-*`

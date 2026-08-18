@@ -2,6 +2,8 @@
 // Read by both the server component and the client map, so it depends on neither
 // `server-only` nor the DOM — same contract as `frame.ts`.
 
+import type { useTranslations } from "next-intl";
+
 import type { SortDir, TargetSortKey } from "@/app/queries";
 import { TARGET_STATES, type TargetState } from "@/lib/types";
 
@@ -11,14 +13,18 @@ export type TargetView = {
   states: readonly TargetState[];
 };
 
-/** Declaration order is menu order. Keys are ASCII and reach the URL; labels never do. */
-export const SORT_OPTIONS: ReadonlyArray<{ key: TargetSortKey; label: string }> = [
-  { key: "expectancy", label: "Expected value" },
-  { key: "loot", label: "Loot" },
-  { key: "odds", label: "Odds" },
-  { key: "resistance", label: "Resistance" },
-  { key: "name", label: "Name" },
-  { key: "surveyed", label: "Surveyed" },
+// See the note in `text.ts`: structurally compatible with both
+// `useTranslations` and `getTranslations`.
+type T = ReturnType<typeof useTranslations<"TargetToolbar">>;
+
+/** Declaration order is menu order. Keys are ASCII and reach the URL; `labelKey` never does. */
+export const SORT_OPTIONS: ReadonlyArray<{ key: TargetSortKey; labelKey: string }> = [
+  { key: "expectancy", labelKey: "sortExpectancy" },
+  { key: "loot", labelKey: "sortLoot" },
+  { key: "odds", labelKey: "sortOdds" },
+  { key: "resistance", labelKey: "sortResistance" },
+  { key: "name", labelKey: "sortName" },
+  { key: "surveyed", labelKey: "sortSurveyed" },
 ];
 
 // `dismissed` out: this reproduces exactly what `filterConditions` does with no
@@ -83,6 +89,9 @@ export function writeView(params: URLSearchParams, view: TargetView): void {
   }
 }
 
-export function sortLabel(sort: TargetSortKey): string {
-  return SORT_OPTIONS.find((option) => option.key === sort)?.label ?? "Expected value";
+export function sortLabel(sort: TargetSortKey, t: T): string {
+  const labelKey = SORT_OPTIONS.find((option) => option.key === sort)?.labelKey ?? "sortExpectancy";
+  // `labelKey` is computed at runtime from `SORT_OPTIONS`, not a literal, so it
+  // cannot be checked against `T`'s literal key union.
+  return (t as (key: string) => string)(labelKey);
 }

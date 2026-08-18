@@ -51,9 +51,6 @@ export type FieldGroup = {
   fields: TargetField[];
 };
 
-const PROMPT_GOOGLE = "Fetch the facts";
-const PROMPT_SURVEY = "Re-survey the sector";
-
 function nothingToSay(reason: string): FieldAction {
   return { kind: "none", reason };
 }
@@ -103,89 +100,78 @@ export function chosenPhone(
   return null;
 }
 
-function registryGroup(target: TargetRow): FieldGroup {
+function registryGroup(target: TargetRow, t: T): FieldGroup {
   const years = dateFromDay(target.companyCreatedAt);
+  const resurvey: FieldAction = { kind: "resurvey", prompt: t("promptSurvey") };
 
   return {
     key: "registry",
-    name: "The registry",
+    name: t("groupRegistry"),
     fields: [
-      field("siret", "SIRET", target.siret, ["sirene"], nothingToSay("Always present.")),
-      field("siren", "SIREN", target.siren, ["sirene"], nothingToSay("Always present.")),
-      field(
-        "legalName",
-        "Legal name",
-        text(target.legalName),
-        ["sirene"],
-        { kind: "resurvey", prompt: PROMPT_SURVEY },
-      ),
+      field("siret", "SIRET", target.siret, ["sirene"], nothingToSay(t("alwaysPresent"))),
+      field("siren", "SIREN", target.siren, ["sirene"], nothingToSay(t("alwaysPresent"))),
+      field("legalName", t("legalName"), text(target.legalName), ["sirene"], resurvey),
       field(
         "naf",
-        "Activity",
+        t("activity"),
         [text(target.naf), text(target.nafLabel)].filter(Boolean).join(" · ") || null,
         ["sirene"],
-        { kind: "resurvey", prompt: PROMPT_SURVEY },
+        resurvey,
       ),
       field(
         "address",
-        "Address",
+        t("address"),
         [target.address, target.postalCode, target.city].filter(Boolean).join(" · ") || null,
         ["sirene"],
-        { kind: "resurvey", prompt: PROMPT_SURVEY },
+        resurvey,
       ),
-      field(
-        "founded",
-        "Founded",
-        years,
-        ["sirene"],
-        { kind: "resurvey", prompt: PROMPT_SURVEY },
-      ),
+      field("founded", t("founded"), years, ["sirene"], resurvey),
       field(
         "establishments",
-        "Open establishments",
+        t("openEstablishments"),
         target.establishmentCount === null ? null : formatNumber(target.establishmentCount, 0),
         ["sirene"],
-        { kind: "resurvey", prompt: PROMPT_SURVEY },
+        resurvey,
       ),
       field(
         "headcount",
-        "Headcount band",
+        t("headcountBand"),
         // `NN` is the INSEE code for "not filed", not a band.
         text(target.employeeRange) === "NN" ? null : text(target.employeeRange),
         ["sirene"],
-        nothingToSay("The registry filed no headcount band for this establishment."),
+        nothingToSay(t("noHeadcountBand")),
       ),
       field(
         "category",
-        "Company category",
+        t("companyCategory"),
         text(target.companyCategory),
         ["sirene"],
-        nothingToSay("Not classified by the registry."),
+        nothingToSay(t("notClassified")),
       ),
       field(
         "revenue",
-        "Revenue",
+        t("revenue"),
         target.revenueCents === null
           ? null
           : `${formatEuros(target.revenueCents, { decimals: "never" })}${target.financesYear ? ` (${target.financesYear})` : ""}`,
         ["sirene"],
         // SIRENE returns `ca: 0` for "accounts not filed". That is an answer,
         // not a gap, so there is no button to offer.
-        nothingToSay("No accounts filed. That is an answer from the registry, not a gap."),
+        nothingToSay(t("noAccountsFiledRegistry")),
         true,
       ),
       field(
         "netIncome",
-        "Net income",
+        t("netIncome"),
         target.netIncomeCents === null
           ? null
           : formatEuros(target.netIncomeCents, { decimals: "never" }),
         ["sirene"],
-        nothingToSay("No accounts filed."),
+        nothingToSay(t("noAccountsFiled")),
       ),
       field(
         "directors",
-        "Directors",
+        t("directors"),
         target.directors.length === 0
           ? null
           : target.directors
@@ -194,90 +180,88 @@ function registryGroup(target: TargetRow): FieldGroup {
               )
               .join(" · "),
         ["sirene"],
-        { kind: "resurvey", prompt: PROMPT_SURVEY },
+        resurvey,
       ),
     ],
   };
 }
 
-function googleGroup(target: TargetRow): FieldGroup {
+function googleGroup(target: TargetRow, t: T): FieldGroup {
   const site = chosenSite(target);
   const tel = chosenPhone(target);
 
   // Google facts are purged past 30 days under Google's terms, so an empty
   // field after a purge is not the same thing as one never queried.
-  const prompt = target.googleStale
-    ? "Purged past 30 days — fetch again"
-    : PROMPT_GOOGLE;
+  const prompt = target.googleStale ? t("promptPurgedFetchAgain") : t("promptGoogle");
 
   return {
     key: "google",
-    name: "Google Places",
+    name: t("groupGoogle"),
     fields: [
       {
         key: "website",
-        name: "Website",
+        name: t("website"),
         value: site?.url ?? null,
         // The source badge follows WHO SUPPLIED the value, not the column.
         sources: site ? [site.source] : ["google", "log"],
         action: site
           ? null
-          : { kind: "input", field: "website", prompt: "Set the website…" },
+          : { kind: "input", field: "website", prompt: t("promptSetWebsite") },
         primary: true,
       },
       {
         key: "phone",
-        name: "Phone",
+        name: t("phone"),
         value: tel?.number ?? null,
         sources: tel ? [tel.source] : ["google", "log"],
         action: tel
           ? null
-          : { kind: "input", field: "phone", prompt: "Set the phone…" },
+          : { kind: "input", field: "phone", prompt: t("promptSetPhone") },
         primary: true,
       },
       field(
         "rating",
-        "Rating",
+        t("rating"),
         target.ratingTenths === null ? null : `${formatRatingTenths(target.ratingTenths)} / 5`,
         ["google"],
         { kind: "api", prompt },
       ),
       field(
         "reviews",
-        "Reviews",
+        t("reviews"),
         target.reviewCount === null ? null : formatNumber(target.reviewCount, 0),
         ["google"],
         { kind: "api", prompt },
       ),
       field(
         "priceLevel",
-        "Price level",
+        t("priceLevel"),
         target.priceLevel === null ? null : "€".repeat(Math.max(1, target.priceLevel)),
         ["google"],
         { kind: "api", prompt },
       ),
       field(
         "hours",
-        "Opening hours",
+        t("openingHours"),
         target.openingHours?.weekdayDescriptions?.length
-          ? `${target.openingHours.weekdayDescriptions.length} days published`
+          ? t("daysPublished", { count: target.openingHours.weekdayDescriptions.length })
           : null,
         ["google"],
         { kind: "api", prompt },
       ),
       field(
         "status",
-        "Business status",
+        t("businessStatus"),
         text(target.businessStatus),
         ["google"],
         { kind: "api", prompt },
       ),
       field(
         "lastQueried",
-        "Last queried",
+        t("lastQueried"),
         shortDate(target.googleFetchedAt),
         ["google"],
-        { kind: "api", prompt: PROMPT_GOOGLE },
+        { kind: "api", prompt: t("promptGoogle") },
       ),
     ],
   };
@@ -291,26 +275,26 @@ function googleGroup(target: TargetRow): FieldGroup {
  * website address the audit has nothing to read, so the offered action is
  * manual entry rather than enrichment.
  */
-function auditGroup(target: TargetRow): FieldGroup {
+function auditGroup(target: TargetRow, t: T): FieldGroup {
   const site = chosenSite(target);
   const audit = target.siteAudit;
 
   if (!audit) {
     return {
       key: "audit",
-      name: "The site audit",
+      name: t("groupAudit"),
       fields: [
         {
           key: "audit",
-          name: "Site audit",
+          name: t("siteAudit"),
           value: null,
           sources: ["audit"],
           action: site
-            ? { kind: "api", prompt: PROMPT_GOOGLE }
+            ? { kind: "api", prompt: t("promptGoogle") }
             : {
                 kind: "input",
                 field: "website",
-                prompt: "No address to read — set the website…",
+                prompt: t("promptNoAddressSetWebsite"),
               },
           primary: false,
         },
@@ -334,59 +318,59 @@ function auditGroup(target: TargetRow): FieldGroup {
     // carries an action, and there is no good one: the page was read.
     action:
       value === undefined
-        ? nothingToSay("The page was read; this marker was not found on it.")
+        ? nothingToSay(t("markerNotFound"))
         : null,
     primary: false,
   });
 
   return {
     key: "audit",
-    name: "The site audit",
+    name: t("groupAudit"),
     fields: [
-      field("url", "Audited address", text(audit.url), ["audit"], {
+      field("url", t("auditedAddress"), text(audit.url), ["audit"], {
         kind: "input",
         field: "website",
-        prompt: "Set the website…",
+        prompt: t("promptSetWebsite"),
       }),
-      field("auditedOn", "Audited on", shortDate(target.auditedAt), ["audit"], {
+      field("auditedOn", t("auditedOn"), shortDate(target.auditedAt), ["audit"], {
         kind: "api",
-        prompt: PROMPT_GOOGLE,
+        prompt: t("promptGoogle"),
       }),
-      field("tech", "Technology", text(audit.tech), ["audit"], nothingToSay(
-        "No recognised technology marker in the page.",
+      field("tech", t("technology"), text(audit.tech), ["audit"], nothingToSay(
+        t("noTechMarker"),
       )),
-      mark("https", "HTTPS", audit.https, "Yes", "No"),
-      mark("viewport", "Mobile viewport", audit.viewport, "Yes", "No"),
-      mark("title", "Title", audit.titleFilled, "Filled in", "Empty or generic"),
+      mark("https", "HTTPS", audit.https, t("yes"), t("no")),
+      mark("viewport", t("mobileViewport"), audit.viewport, t("yes"), t("no")),
+      mark("title", t("title"), audit.titleFilled, t("filledIn"), t("emptyOrGeneric")),
       mark(
         "structuredData",
-        "Structured data",
+        t("structuredData"),
         audit.structuredData,
-        "Present",
-        "Absent",
+        t("present"),
+        t("absent"),
       ),
-      mark("theme", "Theme", audit.defaultTheme, "Default, untouched", "Custom"),
-      mark("photos", "Usable photos", audit.usablePhotos, "Yes", "No"),
-      mark("agency", "Agency credited", audit.agencyDetected, "Yes", "No"),
-      mark("onlineSales", "Online sales", audit.onlineSales, "Yes", "No"),
-      mark("onlineBooking", "Online booking", audit.onlineBooking, "Yes", "No"),
+      mark("theme", t("theme"), audit.defaultTheme, t("defaultUntouched"), t("custom")),
+      mark("photos", t("usablePhotos"), audit.usablePhotos, t("yes"), t("no")),
+      mark("agency", t("agencyCredited"), audit.agencyDetected, t("yes"), t("no")),
+      mark("onlineSales", t("onlineSales"), audit.onlineSales, t("yes"), t("no")),
+      mark("onlineBooking", t("onlineBooking"), audit.onlineBooking, t("yes"), t("no")),
       field(
         "sitemap",
-        "Sitemap",
+        t("sitemap"),
         audit.sitemapUrlCount === undefined
           ? null
           : audit.sitemapUrlCount >= 1
-            ? `${formatNumber(audit.sitemapUrlCount, 0)} URLs`
-            : "None",
+            ? t("sitemapUrls", { count: audit.sitemapUrlCount })
+            : t("none"),
         ["audit"],
-        nothingToSay("Not reachable when the page was read."),
+        nothingToSay(t("sitemapNotReachable")),
       ),
       field(
         "lastChange",
-        "Last change",
+        t("lastChange"),
         text(audit.lastModified)?.slice(0, 10) ?? null,
         ["audit"],
-        nothingToSay("The server published no date for the page."),
+        nothingToSay(t("noPublishedDate")),
       ),
     ],
   };
@@ -395,43 +379,43 @@ function auditGroup(target: TargetRow): FieldGroup {
 function logGroup(target: TargetRow, entries: number, t: T): FieldGroup {
   return {
     key: "log",
-    name: "Yours",
+    name: t("groupLog"),
     fields: [
       // `target.state` is a stored key (`spotted`, `engaged`): show the label.
       field(
         "state",
-        "Approach state",
+        t("approachState"),
         stateLabel(t)[target.state] ?? target.state,
         ["log"],
-        nothingToSay("Always set."),
+        nothingToSay(t("alwaysSet")),
       ),
-      field("takenOn", "Taken on", shortDate(target.capturedAt), ["log"], {
+      field("takenOn", t("takenOn"), shortDate(target.capturedAt), ["log"], {
         kind: "none",
-        reason: "Not taken yet. Record the take from the approach.",
+        reason: t("notTakenYet"),
       }),
       field(
         "logEntries",
-        "Log entries",
+        t("logEntries"),
         entries === 0 ? null : formatNumber(entries, 0),
         ["log"],
         {
           kind: "none",
-          reason: "Nothing said yet. Move a step in the approach to write one.",
+          reason: t("nothingSaidYet"),
         },
       ),
       field(
         "handEntry",
-        "Last hand entry",
+        t("lastHandEntry"),
         shortDate(target.manualNotedAt),
         ["log"],
-        { kind: "none", reason: "You have not typed anything on this record." },
+        { kind: "none", reason: t("nothingTypedYet") },
       ),
       field(
         "neighbourhood",
-        "Neighbourhood",
+        t("neighbourhood"),
         proximityLabel(t)[target.proximity] ?? target.proximity,
         ["computed"],
-        nothingToSay("Computed from the businesses already surveyed around."),
+        nothingToSay(t("computedFromNearby")),
       ),
     ],
   };
@@ -444,9 +428,9 @@ export function fieldInventory(
   t: T,
 ): FieldGroup[] {
   return [
-    registryGroup(target),
-    googleGroup(target),
-    auditGroup(target),
+    registryGroup(target, t),
+    googleGroup(target, t),
+    auditGroup(target, t),
     logGroup(target, logEntries, t),
   ];
 }

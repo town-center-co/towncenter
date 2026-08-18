@@ -17,6 +17,7 @@
 import "server-only";
 
 import { and, desc, eq, gte, inArray, lte, ne, sql, type SQL } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 
 import type { Account } from "@/lib/accounts";
 import { getCumulativeAreaKm2 as readCumulativeAreaKm2 } from "@/lib/billing/area";
@@ -214,9 +215,12 @@ export type JournalEntry = {
   occurredAt: string;
 };
 
+export type FrontAction = "followUp" | "call" | "walkPast" | "priceIt";
+
 export type FrontLine = {
   target: TargetRow;
-  action: string;
+  /** ASCII key: `DailyFront.action.*` in the translated verb display, never shown as-is. */
+  action: FrontAction;
   reason: string;
   daysSinceLastEvent: number | null;
   overdue: boolean;
@@ -945,6 +949,7 @@ export async function listJournal(
 const FOLLOWUP_AFTER_DAYS = 3;
 
 export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]> {
+  const t = await getTranslations("DailyFront");
   const [records, anchors, outcomeCount, lastEvents, grid] =
     await Promise.all([
     db
@@ -1000,11 +1005,11 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
       const overdue = late >= FOLLOWUP_AFTER_DAYS;
       return {
         ...line,
-        action: "Follow up",
+        action: "followUp" as FrontAction,
         reason:
           daysSinceLastEvent === null
-            ? "engaged, no trace of contact"
-            : `follow-up due for ${late} d`,
+            ? t("reasonEngagedNoContact")
+            : t("reasonFollowUpDue", { days: late }),
         priority: overdue ? 0 : 1,
         overdue,
       };
@@ -1013,8 +1018,11 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
     if (target.state === "studied") {
       return {
         ...line,
-        action: "Call",
-        reason: `resistance ${target.resistancePercent} % · ${target.lootReason}`,
+        action: "call" as FrontAction,
+        reason: t("reasonResistance", {
+          pct: target.resistancePercent,
+          lootReason: target.lootReason,
+        }),
         priority: 2,
         overdue: false,
       };
@@ -1022,7 +1030,7 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
 
     return {
       ...line,
-      action: "Walk past",
+      action: "walkPast" as FrontAction,
       reason: target.lootReason,
       priority: 3,
       overdue: false,
@@ -1058,8 +1066,8 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
         ...bestOffGrid,
         // the verb follows the seat: an off-grid target is not called, it is
         // PRICED: a visit and a hand-written quote
-        action: "Price it",
-        reason: `${bestOffGrid.reason} · seat reserved for off-grid`,
+        action: "priceIt" as FrontAction,
+        reason: t("reasonSeatReservedForOffGrid", { reason: bestOffGrid.reason }),
       };
     }
   }

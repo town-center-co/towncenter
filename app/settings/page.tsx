@@ -48,9 +48,12 @@ const COMMON = {
   isFranchiseGroupSite: false,
 };
 
-const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
+function witnesses(
+  t: Awaited<ReturnType<typeof getTranslations<"Witnesses">>>,
+): Record<string, { who: string; facts: ScoringFacts }> {
+  return {
   baseCents: {
-    who: "A young shop · 12 reviews · no website · no usable photo",
+    who: t("baseCents"),
     facts: {
       ...COMMON,
       openEstablishmentCount: 1,
@@ -60,7 +63,7 @@ const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
     },
   },
   fullSiteCents: {
-    who: "A typical shop · one address · 235 reviews · no website",
+    who: t("fullSiteCents"),
     facts: {
       ...COMMON,
       openEstablishmentCount: 1,
@@ -70,7 +73,7 @@ const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
     },
   },
   multiPageCents: {
-    who: "A restaurant · a nine-page site, unreachable · 180 reviews",
+    who: t("multiPageCents"),
     facts: {
       ...COMMON,
       openEstablishmentCount: 1,
@@ -80,7 +83,7 @@ const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
     },
   },
   multiAddressCents: {
-    who: "A three-shop chain · one owner · no website",
+    who: t("multiAddressCents"),
     facts: {
       ...COMMON,
       openEstablishmentCount: 3,
@@ -90,7 +93,7 @@ const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
     },
   },
   recurringBaseCents: {
-    who: "A typical shop · one address · 235 reviews · no website",
+    who: t("recurringBaseCents"),
     facts: {
       ...COMMON,
       openEstablishmentCount: 1,
@@ -99,7 +102,8 @@ const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
       site: { issue: "no_known_site" },
     },
   },
-};
+  };
+}
 
 async function ApiKeySection({ ownerId }: { ownerId: string }) {
   const t = await getTranslations("ApiKeySection");
@@ -156,9 +160,10 @@ async function ApiKeySection({ ownerId }: { ownerId: string }) {
 
 export default async function SettingsPage() {
   const owner = await requireUser();
-  const [grid, t] = await Promise.all([
+  const [grid, t, tWitnesses] = await Promise.all([
     getPriceGrid(owner),
     getTranslations("SettingsPage"),
+    getTranslations("Witnesses"),
   ]);
   const locale = await getAccountLocale(owner.id);
 
@@ -188,7 +193,7 @@ export default async function SettingsPage() {
         </div>
       </header>
 
-      <PriceGridForm grid={grid} witnesses={WITNESSES} />
+      <PriceGridForm grid={grid} witnesses={witnesses(tWitnesses)} />
     </main>
   );
 }

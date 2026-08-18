@@ -62,12 +62,12 @@ export function TargetToolbar({ view, onChange, busy = false }: TargetToolbarPro
             size="compact"
             className="target-toolbar__button"
             aria-label={t("sortAriaLabel", {
-              sort: sortLabel(view.sort),
+              sort: sortLabel(view.sort, t),
               direction: view.dir === "desc" ? t("highestFirst") : t("lowestFirst"),
             })}
           >
             <SlidersHorizontal aria-hidden="true" />
-            <span className="target-toolbar__label">{sortLabel(view.sort)}</span>
+            <span className="target-toolbar__label">{sortLabel(view.sort, t)}</span>
             {view.dir === "desc" ? (
               <ArrowDown aria-hidden="true" />
             ) : (
@@ -86,7 +86,7 @@ export function TargetToolbar({ view, onChange, busy = false }: TargetToolbarPro
           >
             {SORT_OPTIONS.map((option) => (
               <DropdownMenuRadioItem key={option.key} value={option.key}>
-                {option.label}
+                {t(option.labelKey as Parameters<typeof t>[0])}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>

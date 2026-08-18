@@ -23,14 +23,23 @@ export type DailyFrontProps = {
   className?: string;
 };
 
+const COUNT_TO_VERB: Record<FrontLine["action"], Parameters<ReturnType<typeof useTranslations<"DailyFront">>>[0]> = {
+  followUp: "countToFollowUp",
+  call: "countToCall",
+  walkPast: "countToWalkPast",
+  priceIt: "countToPriceIt",
+};
+
 /**
  * The verbs of the day, counted.
  *
  * The order comes from `listFront`, which already sorted the rows: grouping
  * only. Re-sorting here would give a header that contradicts the rows below.
  */
-function verbsOfTheDay(rows: readonly FrontLine[]): { verb: string; total: number }[] {
-  const counts = new Map<string, number>();
+function verbsOfTheDay(
+  rows: readonly FrontLine[],
+): { verb: FrontLine["action"]; total: number }[] {
+  const counts = new Map<FrontLine["action"], number>();
   for (const row of rows) {
     counts.set(row.action, (counts.get(row.action) ?? 0) + 1);
   }
@@ -45,6 +54,13 @@ export function DailyFront({
 }: DailyFrontProps) {
   const t = useTranslations("DailyFront");
   const overdue = rows.filter((row) => row.overdue).length;
+
+  const actionLabel: Record<FrontLine["action"], string> = {
+    followUp: t("actionFollowUp"),
+    call: t("actionCall"),
+    walkPast: t("actionWalkPast"),
+    priceIt: t("actionPriceIt"),
+  };
 
   // Lateness decides the INITIAL state only. An effect reopening the panel
   // whenever `overdue > 0` would also reopen it right after the user closed
@@ -77,10 +93,10 @@ export function DailyFront({
                 {index > 0 ? <span className="tone-3"> · </span> : null}
                 <span
                   className={
-                    verb === "Follow up" && overdue > 0 ? "front__overdue" : "tone-2"
+                    verb === "followUp" && overdue > 0 ? "front__overdue" : "tone-2"
                   }
                 >
-                  {`${total} to ${verb.toLowerCase()}`}
+                  {t(COUNT_TO_VERB[verb], { count: total })}
                 </span>
               </span>
             ))
@@ -126,7 +142,7 @@ export function DailyFront({
                                 { decimals: "never" },
                               )}
                         </span>
-                        <span className="t-micro front__verb">{row.action}</span>
+                        <span className="t-micro front__verb">{actionLabel[row.action]}</span>
                       </span>
                     </button>
                   </li>

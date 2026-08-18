@@ -7,6 +7,8 @@
 // type only, so it is erased at compile time — `app/queries.ts` is
 // `server-only` and must never reach the browser bundle.
 
+import type { useTranslations } from "next-intl";
+
 import type { TargetRow } from "@/app/queries";
 import type { SourceKey } from "@/components/ui";
 import { formatEuros, formatRatingTenths } from "@/lib/format";
@@ -24,6 +26,11 @@ import {
 } from "@/lib/scoring";
 
 import { yearsSince, shortDate, dateFromDay, longDate, formatNumber } from "./text";
+
+// prompt.ts (outside React, always English — see its own header comment)
+// builds one of these with `createTranslator` rather than a hook; structurally
+// compatible with `useTranslations`/`getTranslations` either way.
+type T = ReturnType<typeof useTranslations<"Facts">>;
 
 export type FactKey = "storefront" | "footfall" | "footing" | "means" | "access";
 
@@ -97,10 +104,10 @@ function headcountFloor(code: string | null): number | null {
 }
 
 /** 1. Storefront — the state of the website, from the in-house audit. */
-function storefront(target: TargetRow, now: Date): TargetFact {
+function storefront(target: TargetRow, now: Date, t: T): TargetFact {
   const base = {
     key: "storefront" as const,
-    name: "Storefront",
+    name: t("nameStorefront"),
     sources: ["audit"] as const,
     surveyedOn: shortDate(target.auditedAt),
     stale: false,
@@ -116,7 +123,7 @@ function storefront(target: TargetRow, now: Date): TargetFact {
       verbatim: [],
       // "Never audited" is not "no website": the first leaves the scoring
       // factor neutral, the second raises it.
-      note: "Audit never run. This is not “no website”: the calculation stays neutral.",
+      note: t("neverAudited"),
     };
   }
 
@@ -124,7 +131,7 @@ function storefront(target: TargetRow, now: Date): TargetFact {
     return {
       ...base,
       value: 5,
-      verbatim: ["Instagram used as a website", audit.url ?? ""].filter(Boolean),
+      verbatim: [t("instagramAsWebsite"), audit.url ?? ""].filter(Boolean),
       note: null,
     };
   }
@@ -136,7 +143,7 @@ function storefront(target: TargetRow, now: Date): TargetFact {
       ...base,
       sources: ["google"] as const,
       value: 0,
-      verbatim: ["No known website"],
+      verbatim: [t("noKnownWebsite")],
       note: null,
     };
   }
@@ -147,40 +154,38 @@ function storefront(target: TargetRow, now: Date): TargetFact {
       value: null,
       verbatim: [],
       note: audit.url
-        ? `Site unreachable: ${audit.url} did not answer. Unreachable is not “no website”.`
-        : "Site unreachable. Unreachable is not “no website”.",
+        ? t("siteUnreachableWithUrl", { url: audit.url })
+        : t("siteUnreachable"),
     };
   }
 
   const marks: Mark[] = [];
 
   if (audit.https !== undefined) {
-    marks.push({ ok: audit.https, text: audit.https ? "HTTPS" : "No HTTPS" });
+    marks.push({ ok: audit.https, text: audit.https ? t("https") : t("noHttps") });
   }
   if (audit.viewport !== undefined) {
     marks.push({
       ok: audit.viewport,
-      text: audit.viewport ? "Mobile-ready" : "No mobile viewport",
+      text: audit.viewport ? t("mobileReady") : t("noMobileViewport"),
     });
   }
   if (audit.titleFilled !== undefined) {
     marks.push({
       ok: audit.titleFilled,
-      text: audit.titleFilled ? "Title filled in" : "Title empty or generic",
+      text: audit.titleFilled ? t("titleFilledIn") : t("titleEmptyOrGeneric"),
     });
   }
   if (audit.structuredData !== undefined) {
     marks.push({
       ok: audit.structuredData,
-      text: audit.structuredData ? "Structured data" : "No structured data",
+      text: audit.structuredData ? t("hasStructuredData") : t("noStructuredData"),
     });
   }
   if (audit.defaultTheme !== undefined) {
     marks.push({
       ok: !audit.defaultTheme,
-      text: audit.defaultTheme
-        ? "Default theme never touched"
-        : "Custom theme",
+      text: audit.defaultTheme ? t("defaultThemeNeverTouched") : t("customTheme"),
     });
   }
   if (audit.sitemapUrlCount !== undefined) {
@@ -188,14 +193,14 @@ function storefront(target: TargetRow, now: Date): TargetFact {
       ok: audit.sitemapUrlCount >= 1,
       text:
         audit.sitemapUrlCount >= 1
-          ? `${formatNumber(audit.sitemapUrlCount, 0)} URLs in the sitemap`
-          : "No sitemap",
+          ? t("sitemapUrlCount", { count: formatNumber(audit.sitemapUrlCount, 0) })
+          : t("noSitemap"),
     });
   }
   if (audit.usablePhotos !== undefined) {
     marks.push({
       ok: audit.usablePhotos,
-      text: audit.usablePhotos ? "Usable photos" : "No usable photo",
+      text: audit.usablePhotos ? t("usablePhotos") : t("noUsablePhoto"),
     });
   }
   if (audit.agencyDetected !== undefined) {
@@ -203,7 +208,7 @@ function storefront(target: TargetRow, now: Date): TargetFact {
     // though it is bad news for the deal.
     marks.push({
       ok: audit.agencyDetected,
-      text: audit.agencyDetected ? "Agency already in place" : "No agency credited",
+      text: audit.agencyDetected ? t("agencyAlreadyInPlace") : t("noAgencyCredited"),
     });
   }
 
@@ -215,8 +220,8 @@ function storefront(target: TargetRow, now: Date): TargetFact {
         ok: months <= SITE_STALE_MONTHS,
         text:
           months <= SITE_STALE_MONTHS
-            ? `Sign of life on ${longDate(audit.lastModified)}`
-            : `No trace of a change in ${months} months`,
+            ? t("signOfLife", { date: longDate(audit.lastModified) ?? "" })
+            : t("noChangeTrace", { months }),
       });
     }
   }
@@ -227,25 +232,22 @@ function storefront(target: TargetRow, now: Date): TargetFact {
 
   // These two decide the SCOPE of the deal, not the storefront score. They are
   // reported, never counted.
-  if (audit.onlineSales) verbatim.push("Online sales");
-  if (audit.onlineBooking) verbatim.push("Online booking");
+  if (audit.onlineSales) verbatim.push(t("onlineSales"));
+  if (audit.onlineBooking) verbatim.push(t("onlineBooking"));
 
   return {
     ...base,
     value: percentOfMarks(marks),
     verbatim,
-    note:
-      marks.length === 0
-        ? "Home page read, no usable marker found."
-        : null,
+    note: marks.length === 0 ? t("noMarkerFound") : null,
   };
 }
 
 /** 2. Footfall — Google rating and reviews, expired at 30 days. */
-function footfall(target: TargetRow, now: Date): TargetFact {
+function footfall(target: TargetRow, now: Date, t: T): TargetFact {
   const base = {
     key: "footfall" as const,
-    name: "Footfall",
+    name: t("nameFootfall"),
     sources: ["google"] as const,
     surveyedOn: shortDate(target.googleFetchedAt),
     stale: target.googleStale,
@@ -258,7 +260,7 @@ function footfall(target: TargetRow, now: Date): TargetFact {
       verbatim: [],
       // Google's terms require ERASING these past 30 days, not just hiding
       // them. The enrichment purges, this screen says so.
-      note: "Google facts purged — past 30 days. Run the enrichment again.",
+      note: t("googlePurged"),
     };
   }
 
@@ -268,9 +270,7 @@ function footfall(target: TargetRow, now: Date): TargetFact {
       surveyedOn: null,
       value: null,
       verbatim: [],
-      note: target.googleFetchedAt
-        ? "Google returns neither rating nor reviews for this address."
-        : "Google never queried for this business.",
+      note: target.googleFetchedAt ? t("noRatingNoReviews") : t("neverQueried"),
     };
   }
 
@@ -292,16 +292,16 @@ function footfall(target: TargetRow, now: Date): TargetFact {
   else paceScore = 25;
 
   const verbatim: string[] = [];
-  if (rating !== null) verbatim.push(`Rating ${formatRatingTenths(rating)}`);
-  verbatim.push(`${formatNumber(reviews, 0)} reviews`);
+  if (rating !== null) verbatim.push(t("ratingValue", { rating: formatRatingTenths(rating) }));
+  verbatim.push(t("reviewCount", { count: formatNumber(reviews, 0) }));
   if (years !== null && years >= 1) {
-    verbatim.push(`${formatNumber(Math.round(perYear), 0)} reviews a year`);
+    verbatim.push(t("reviewsPerYear", { count: formatNumber(Math.round(perYear), 0) }));
   }
   if (target.priceLevel !== null) {
-    verbatim.push(`Price level ${"€".repeat(Math.max(1, target.priceLevel))}`);
+    verbatim.push(t("priceLevelValue", { level: "€".repeat(Math.max(1, target.priceLevel)) }));
   }
   if (target.businessStatus === "CLOSED_PERMANENTLY") {
-    verbatim.push("Permanently closed according to Google");
+    verbatim.push(t("closedPermanently"));
   }
 
   return {
@@ -317,10 +317,10 @@ function footfall(target: TargetRow, now: Date): TargetFact {
 /** Twenty years of trading fills the bar. */
 const FOOTING_FULL_YEARS = 20;
 
-function footing(target: TargetRow, now: Date): TargetFact {
+function footing(target: TargetRow, now: Date, t: T): TargetFact {
   const base = {
     key: "footing" as const,
-    name: "Footing",
+    name: t("nameFooting"),
     sources: ["sirene"] as const,
     surveyedOn: null,
     stale: false,
@@ -341,12 +341,10 @@ function footing(target: TargetRow, now: Date): TargetFact {
   const verbatim: string[] = [];
   const founded = dateFromDay(target.companyCreatedAt);
   if (founded && years !== null) {
-    verbatim.push(`Founded ${founded}`, `${Math.floor(years)} years in business`);
+    verbatim.push(t("founded", { date: founded }), t("yearsInBusiness", { count: Math.floor(years) }));
   }
   if (establishments !== null) {
-    verbatim.push(
-      `${establishments} open establishment${establishments > 1 ? "s" : ""}`,
-    );
+    verbatim.push(t("openEstablishmentCount", { count: establishments }));
   }
   if (target.companyCategory) verbatim.push(target.companyCategory);
 
@@ -356,18 +354,15 @@ function footing(target: TargetRow, now: Date): TargetFact {
     ...base,
     value,
     verbatim,
-    note:
-      value === null
-        ? "Neither founding date nor establishment count in the SIRENE record."
-        : null,
+    note: value === null ? t("noFootingData") : null,
   };
 }
 
 /** 4. Means — revenue, headcount, company category. */
-function means(target: TargetRow, now: Date): TargetFact {
+function means(target: TargetRow, now: Date, t: T): TargetFact {
   const base = {
     key: "means" as const,
-    name: "Means",
+    name: t("nameMeans"),
     sources: ["sirene"] as const,
     surveyedOn: null,
     stale: false,
@@ -386,7 +381,14 @@ function means(target: TargetRow, now: Date): TargetFact {
   // filed". A null value is an absence, not poverty.
   if (target.revenueCents !== null && target.revenueCents > 0) {
     verbatim.push(
-      `Revenue ${formatEuros(target.revenueCents, { decimals: "never" })}${financialYear ? ` (${financialYear})` : ""}`,
+      financialYear
+        ? t("revenueWithYear", {
+            amount: formatEuros(target.revenueCents, { decimals: "never" }),
+            year: financialYear,
+          })
+        : t("revenue", {
+            amount: formatEuros(target.revenueCents, { decimals: "never" }),
+          }),
     );
     if (recentFinancialYear) {
       if (target.revenueCents >= REVENUE_COMFORTABLE_CENTS) revenueScore = 100;
@@ -396,15 +398,13 @@ function means(target: TargetRow, now: Date): TargetFact {
     } else {
       // A financial year older than the cutoff does not penalise; it falls
       // through to headcount, exactly as `capacityFactor` does.
-      notes.push(
-        `Financial year ${financialYear}: too old to count, headcount takes over.`,
-      );
+      notes.push(t("financialYearTooOld", { year: financialYear }));
     }
   }
 
   if (target.netIncomeCents !== null) {
     verbatim.push(
-      `Net income ${formatEuros(target.netIncomeCents, { decimals: "never" })}`,
+      t("netIncome", { amount: formatEuros(target.netIncomeCents, { decimals: "never" }) }),
     );
   }
 
@@ -416,7 +416,7 @@ function means(target: TargetRow, now: Date): TargetFact {
     else if (headcount >= 1) headcountScore = 40;
     else headcountScore = 15;
     verbatim.push(
-      headcount === 0 ? "No employees" : `${headcount} employee${headcount > 1 ? "s" : ""} or more`,
+      headcount === 0 ? t("noEmployees") : t("employeesOrMore", { count: headcount }),
     );
   }
 
@@ -426,19 +426,15 @@ function means(target: TargetRow, now: Date): TargetFact {
     ...base,
     value,
     verbatim,
-    note:
-      value === null
-        ? notes[0] ??
-          "No accounts filed and no headcount band recorded: nothing to measure."
-        : (notes[0] ?? null),
+    note: value === null ? (notes[0] ?? t("nothingToMeasure")) : (notes[0] ?? null),
   };
 }
 
 /** 5. Access — who there is to talk to. */
-function access(target: TargetRow): TargetFact {
+function access(target: TargetRow, t: T): TargetFact {
   const base = {
     key: "access" as const,
-    name: "Access",
+    name: t("nameAccess"),
     // The source badge follows WHO SUPPLIED the value: a hand-typed number
     // comes from your log, not from Google Places.
     sources: (target.manualPhone
@@ -459,10 +455,10 @@ function access(target: TargetRow): TargetFact {
     const name = [director.firstNames, director.lastName].filter(Boolean).join(" ");
     verbatim.push(`${name} — ${director.title.toLowerCase()}`);
     if (target.directors.length > 1) {
-      verbatim.push(`and ${target.directors.length - 1} other${target.directors.length > 2 ? "s" : ""}`);
+      verbatim.push(t("andOthers", { count: target.directors.length - 1 }));
     }
   } else {
-    verbatim.push("No director named");
+    verbatim.push(t("noDirectorNamed"));
   }
 
   // A hand-typed phone number wins and never goes stale: it is not Google
@@ -474,7 +470,7 @@ function access(target: TargetRow): TargetFact {
     parts.push(null);
   } else {
     parts.push(target.phone ? 100 : 0);
-    verbatim.push(target.phone ?? "No known phone number");
+    verbatim.push(target.phone ?? t("noKnownPhoneNumber"));
   }
 
   parts.push(target.address ? 100 : 0);
@@ -489,7 +485,7 @@ function access(target: TargetRow): TargetFact {
     note:
       target.manualPhone || !(target.googleStale || !target.googleFetchedAt)
         ? null
-        : "Phone not counted: Google was never queried, or its facts expired. You can type one in on the Facts tab.",
+        : t("phoneNotCounted"),
   };
 }
 
@@ -499,13 +495,13 @@ function access(target: TargetRow): TargetFact {
  * The order is usefulness on a phone call, not alphabetical: storefront (the
  * reason to call), footfall, footing, means, then access.
  */
-export function fiveFacts(target: TargetRow, now: Date = new Date()): TargetFact[] {
+export function fiveFacts(target: TargetRow, now: Date = new Date(), t: T): TargetFact[] {
   return [
-    storefront(target, now),
-    footfall(target, now),
-    footing(target, now),
-    means(target, now),
-    access(target),
+    storefront(target, now, t),
+    footfall(target, now, t),
+    footing(target, now, t),
+    means(target, now, t),
+    access(target, t),
   ];
 }
 

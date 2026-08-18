@@ -48,6 +48,7 @@ export {
   type BandKey,
   type ResistanceBand,
   RESISTANCE_BANDS,
+  BAND_LABEL_KEY,
   resistanceBand,
   resistanceFromOdds,
   roundTo5,

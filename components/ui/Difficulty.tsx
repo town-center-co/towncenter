@@ -78,7 +78,7 @@ export type DifficultyProps = {
 // ASCII band key -> visible qualifier. Kept separate from `RESISTANCE_BANDS[].label`
 // (English, used as a fallback by callers that have not yet gone through
 // `useTranslations`) so this file can translate its own display without them.
-const BAND_LABEL_KEY: Record<BandKey, string> = {
+export const BAND_LABEL_KEY: Record<BandKey, string> = {
   easy: "easy",
   approachable: "approachable",
   solid: "solid",

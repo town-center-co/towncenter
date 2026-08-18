@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/check-db.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "node scripts/migrate.mjs && next start",

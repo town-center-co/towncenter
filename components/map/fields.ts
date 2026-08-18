@@ -123,7 +123,7 @@ function registryGroup(target: TargetRow): FieldGroup {
       field(
         "address",
         "Address",
-        [target.address, target.postalCode, target.city].filter(Boolean).join(" · ") || null,
+        target.address || [target.postalCode, target.city].filter(Boolean).join(" · ") || null,
         ["sirene"],
         { kind: "resurvey", prompt: PROMPT_SURVEY },
       ),

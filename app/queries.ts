@@ -164,6 +164,7 @@ export type TargetNeighbour = {
   distanceMeters: number;
   state: TargetState;
   expectancyCents: number;
+  resistancePercent: number;
 };
 
 export type TargetDetail = {
@@ -733,6 +734,7 @@ export async function getTargetDetail(owner: Account, id: string): Promise<Targe
       distanceMeters: Math.round(distanceMeters(record, raw)),
       state: neighbour.state,
       expectancyCents: neighbour.score.expectancyCents,
+      resistancePercent: neighbour.resistancePercent,
     }));
 
   return {

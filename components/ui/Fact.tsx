@@ -1,6 +1,6 @@
 import { Gauge } from "./Gauge";
 import { nonBreaking } from "./percent";
-import { SOURCES, Sources, type SourceKey } from "./Source";
+import { Sources, type SourceKey } from "./Source";
 import { cx } from "./style";
 
 /**
@@ -44,9 +44,7 @@ export function Fact({
   const empty = value === null || !Number.isFinite(value);
   const bounded = empty ? 0 : Math.min(100, Math.max(0, Math.round(value)));
   const provenance = sources ?? [];
-  // Names in plain text, next to the glyphs. They do not replace the legend,
-  // they save a trip down to it for the row being read.
-  const sourceNames = provenance.map((key) => SOURCES[key].name).join(" · ");
+  const hasVerbatim = !empty && verbatim && verbatim.length > 0;
 
   return (
     <div className={cx("fact", empty && "fact--empty", className)}>
@@ -65,19 +63,15 @@ export function Fact({
         </span>
       </div>
 
-      {empty ? (
-        <p className="t-body-s fact__verbatim">Not recorded — excluded from the calculation.</p>
-      ) : verbatim && verbatim.length > 0 ? (
-        <p className="t-body fact__verbatim">{nonBreaking(verbatim.join(" · "))}</p>
-      ) : null}
-
-      {/* The source shows even when the statistic is empty: an empty row asks
-          exactly one question — who should have filled it — and the glyph is
-          the answer. */}
-      {provenance.length > 0 || surveyedOn ? (
-        <p className="t-body-s fact__source">
+      {empty || hasVerbatim || provenance.length > 0 || surveyedOn ? (
+        <p className="t-body-s fact__verbatim">
+          {empty ? (
+            "Not recorded — excluded from the calculation."
+          ) : hasVerbatim ? (
+            <span className="t-body">{nonBreaking(verbatim.join(" · "))}</span>
+          ) : null}
           <Sources keys={provenance} />
-          {nonBreaking([sourceNames, surveyedOn].filter(Boolean).join(" · "))}
+          {surveyedOn ? <span className="tone-3">{` · ${surveyedOn}`}</span> : null}
           {stale ? <span className="fact__stale"> · to refresh</span> : null}
         </p>
       ) : null}

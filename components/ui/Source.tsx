@@ -1,5 +1,9 @@
+"use client";
+
 // where a displayed figure comes from. the keys are ASCII: they drive
 // `data-source` and the legend order, and are never translated.
+
+import { Popover as PopoverPrimitive } from "radix-ui";
 
 import { cx } from "./style";
 
@@ -135,20 +139,48 @@ export function Source({ sourceKey, withName = false, className }: SourceProps) 
   const source = SOURCES[sourceKey];
 
   return (
-    <span
-      className={cx("source", withName && "source--named", className)}
-      data-source={sourceKey}
-      title={`${source.name} — ${source.what}`}
-    >
-      <Glyph sourceKey={sourceKey} />
-      {withName ? (
-        <span className="source__name t-body-s">{source.name}</span>
-      ) : (
-        // without the visible name the glyph is mute: `title` on a `span` is
-        // not reliably announced.
-        <span className="sr-only">{`Source: ${source.name}`}</span>
-      )}
-    </span>
+    <PopoverPrimitive.Root>
+      <PopoverPrimitive.Trigger asChild>
+        <button
+          type="button"
+          className={cx("source", withName && "source--named", className)}
+          data-source={sourceKey}
+        >
+          <Glyph sourceKey={sourceKey} />
+          {withName ? (
+            <span className="source__name t-body-s">{source.name}</span>
+          ) : (
+            // without the visible name the glyph is mute: the accessible
+            // name of the button has to carry it.
+            <span className="sr-only">{`Source: ${source.name}`}</span>
+          )}
+        </button>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          className="source-popover"
+          side="top"
+          align="start"
+          sideOffset={6}
+          collisionPadding={12}
+        >
+          <PopoverPrimitive.Close className="source-popover__close" aria-label="Close">
+            ✕
+          </PopoverPrimitive.Close>
+          <span className="t-body-s source-popover__name">
+            {source.href ? (
+              <a href={source.href} target="_blank" rel="noreferrer noopener">
+                {source.name}
+              </a>
+            ) : (
+              source.name
+            )}
+          </span>
+          <p className="t-body-s source-popover__what">{source.what}</p>
+          <PopoverPrimitive.Arrow className="source-popover__arrow" />
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 
@@ -170,37 +202,3 @@ export function Sources({ keys, className }: SourcesProps) {
   );
 }
 
-export type SourceLegendProps = {
-  keys: readonly SourceKey[];
-  className?: string;
-};
-
-export function SourceLegend({ keys, className }: SourceLegendProps) {
-  const kept = SOURCE_ORDER.filter((key) => keys.includes(key));
-  if (kept.length === 0) return null;
-
-  return (
-    <ul className={cx("source-legend", className)}>
-      {kept.map((key) => {
-        const source = SOURCES[key];
-        return (
-          <li key={key} className="source-legend__row">
-            <Source key={key} sourceKey={key} />
-            <span className="source-legend__body">
-              <span className="t-body-s source-legend__name">
-                {source.href ? (
-                  <a href={source.href} target="_blank" rel="noreferrer noopener">
-                    {source.name}
-                  </a>
-                ) : (
-                  source.name
-                )}
-              </span>
-              <span className="t-body-s source-legend__what">{source.what}</span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}

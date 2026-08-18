@@ -1134,7 +1134,9 @@ textarea.sheet__input {
 }
 
 .sheet__name {
+  flex: 1 1 auto;
   margin: 0;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -1290,10 +1292,7 @@ textarea.sheet__input {
 }
 
 .field__value {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1);
+  display: block;
   min-width: 0;
 }
 
@@ -1600,7 +1599,6 @@ button.sheet__step:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  margin-block-start: var(--space-2);
   padding-block-start: var(--space-3);
   border-block-start: 1px solid var(--border-1);
 }
@@ -1616,10 +1614,9 @@ button.sheet__step:disabled {
    with nothing to say that they commit to nothing. */
 .sheet__tools {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-2);
-  margin-block-start: var(--space-2);
   padding-block-start: var(--space-3);
   border-block-start: 1px solid var(--border-1);
 }
@@ -1656,47 +1653,54 @@ button.sheet__step:disabled {
   color: var(--failure-text);
 }
 
-/* --- The neighbours --- */
+/* --- The neighbours: one plate, not one card each --- */
 
 .sheet__neighbours {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: var(--space-1) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
 }
 
 .sheet__neighbour {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
   width: 100%;
   min-height: var(--touch-target);
-  padding: var(--space-2);
-  border: 1px solid var(--border-1);
-  border-radius: var(--radius-2);
-  background: var(--surface-2);
+  padding: var(--space-2) 0;
+  border: 0;
+  border-block-end: 1px solid var(--border-1);
+  background: transparent;
   color: var(--text-1);
   text-align: start;
   cursor: pointer;
   min-width: 0;
 }
 
-.sheet__neighbour:hover {
-  border-color: var(--border-2);
+li:last-child > .sheet__neighbour {
+  border-block-end: 0;
 }
 
-.sheet__neighbour[data-state="taken"] {
-  border-color: var(--success);
+.sheet__neighbour:hover .sheet__neighbour-name {
+  color: var(--accent-text);
+}
+
+.sheet__neighbour[data-state="taken"] .sheet__neighbour-stats {
+  color: var(--success-text);
 }
 
 .sheet__neighbour-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
+  min-width: 0;
+}
+
+.sheet__neighbour-stats {
+  flex: 0 0 auto;
 }
 
 /* --- The log: a game-free zone --- */
@@ -1712,6 +1716,7 @@ button.sheet__step:disabled {
 
 .sheet__entry {
   display: flex;
+  align-items: baseline;
   gap: var(--space-3);
   min-width: 0;
   color: var(--text-2);

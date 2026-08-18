@@ -60,6 +60,7 @@ function SignOutItem() {
     <DropdownMenuItem asChild onSelect={(event) => event.preventDefault()}>
       <button
         type="button"
+        className="w-full text-left"
         disabled={pending}
         onClick={(event) => event.currentTarget.form?.requestSubmit()}
       >

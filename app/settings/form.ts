@@ -1,3 +1,4 @@
+import { formatEuros } from "@/lib/format";
 import { PRICE_GRID_SCHEMA } from "@/lib/priceGrid";
 import type { PriceGrid, PriceOffer } from "@/lib/types";
 
@@ -7,6 +8,16 @@ const CAPPABLE_OFFERS: readonly PriceOffer[] = [
   "multi-page",
   "multi-address",
 ];
+
+// which offer each one-time-fee tab prices, so its amount can be checked
+// against that offer's floor/ceiling before it is ever saved — a value the
+// grid would clamp on read is refused on write instead.
+const OFFER_BY_FIELD: Partial<Record<string, PriceOffer>> = {
+  baseCents: "base",
+  fullSiteCents: "full-site",
+  multiPageCents: "multi-page",
+  multiAddressCents: "multi-address",
+};
 
 const EURO_FIELDS = [
   "baseCents",
@@ -85,6 +96,24 @@ export function readGridForm(formData: FormData, base: PriceGrid): GridForm {
       fields[key] = "Enter an amount in euros, e.g. 2000 or 2000.50.";
       continue;
     }
+
+    const offer = OFFER_BY_FIELD[key];
+    if (offer !== undefined && cents < base.floorCents) {
+      fields[key] =
+        `Below the ${formatEuros(base.floorCents)} floor — scoring would never charge this low.`;
+      continue;
+    }
+    if (offer !== undefined && base.cappedOffers.includes(offer) && cents > base.ceilingCents) {
+      fields[key] =
+        `Above the ${formatEuros(base.ceilingCents)} ceiling for this offer — scoring would clamp it back down.`;
+      continue;
+    }
+    if (key === "recurringBaseCents" && cents > base.recurringCapCents) {
+      fields[key] =
+        `Above the ${formatEuros(base.recurringCapCents)}/month cap — scoring would clamp it back down.`;
+      continue;
+    }
+
     raw[key] = cents;
   }
 

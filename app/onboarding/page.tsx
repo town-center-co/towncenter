@@ -239,13 +239,13 @@ function GridStep({ facts }: { facts: OnboardingFacts }) {
         </p>
       ) : (
         <p className="t-body-s tone-2">
-          You are on the default grid. Open the pricing screen to change it, or
-          keep the default and continue.
+          You are on the default grid. Open settings to change it, or keep the
+          default and continue.
         </p>
       )}
       <div className={styles.stepActions}>
-        <Link href="/pricing" className={styles.stepLink}>
-          Open the pricing screen
+        <Link href="/settings" className={styles.stepLink}>
+          Open settings
         </Link>
         <Link href="/onboarding?step=sector" className={styles.stepLink}>
           {facts.hasCustomGrid ? "Continue →" : "Keep the default grid →"}

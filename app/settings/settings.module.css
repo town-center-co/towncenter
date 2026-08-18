@@ -1,0 +1,97 @@
+/* The settings screen. The page frame and the grid editor reuse `pricing.css`
+   (`.pricing`, `.pricing__head`); this module only styles the API key form,
+   copied from the onboarding key step so both stay visually identical. */
+
+.section {
+  display: grid;
+  gap: 12px;
+  max-width: 72rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.keyForm {
+  display: grid;
+  gap: 12px;
+}
+
+.keyLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.keyInput {
+  padding: 10px 12px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background: var(--surface-1);
+  font-size: 14px;
+  font-family: var(--typeface-mono);
+  color: var(--text-1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.keyInput:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+.keyInput[aria-invalid="true"] {
+  border-color: var(--failure);
+}
+
+.fieldError {
+  margin: 0;
+  font-size: 13px;
+  color: var(--failure-text);
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  animation: messageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.message[data-status="success"] {
+  border: 1px solid color-mix(in srgb, var(--success) 32%, transparent);
+  background: color-mix(in srgb, var(--success) 7%, transparent);
+  color: var(--success-text);
+}
+
+.message[data-status="error"] {
+  border: 1px solid color-mix(in srgb, var(--failure) 32%, transparent);
+  background: color-mix(in srgb, var(--failure) 7%, transparent);
+  color: var(--failure-text);
+}
+
+.keyActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.removeForm {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message {
+    animation: none;
+  }
+}

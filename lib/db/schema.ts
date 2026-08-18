@@ -18,7 +18,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 import {
+  DEFAULT_LOCALE,
   EVENT_KINDS,
+  LOCALES,
   SUBSCRIPTION_STATUSES,
   TARGET_STATES,
   TARGET_STATE_RANK,
@@ -27,6 +29,7 @@ import {
   type Bbox,
   type DirectorFact,
   type EventKind,
+  type Locale,
   type PriceGrid,
   type SiteAuditFacts,
   type SubscriptionStatus,
@@ -39,13 +42,16 @@ import {
 // component pulls drizzle and the Postgres driver into the browser bundle.
 
 export {
+  DEFAULT_LOCALE,
   EVENT_KINDS,
+  LOCALES,
   SUBSCRIPTION_STATUSES,
   TARGET_STATES,
   TARGET_STATE_RANK,
   USER_ROLES,
   ZONE_STATUSES,
   type EventKind,
+  type Locale,
   type SubscriptionStatus,
   type TargetState,
   type UserRole,
@@ -386,6 +392,8 @@ export const accountSettings = pgTable("account_settings", {
     .references(() => users.id, { onDelete: "cascade" }),
 
   googlePlacesKey: text("google_places_key"),
+
+  locale: text("locale", { enum: LOCALES }).notNull().default(DEFAULT_LOCALE),
 
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

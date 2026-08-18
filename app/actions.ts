@@ -12,6 +12,7 @@
 // integer cents.
 
 import { refresh } from "next/cache";
+import { getTranslations } from "next-intl/server";
 
 import { requireUser } from "@/lib/accounts";
 
@@ -32,7 +33,7 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 
-import { plural, STATE_LABEL } from "@/components/map/text";
+import { plural, stateLabel } from "@/components/map/text";
 import {
   db,
   events,
@@ -1202,12 +1203,14 @@ export async function advanceTargetAction(
 
   refreshTree();
 
+  const t = await getTranslations("ActionMessages");
+  const labels = stateLabel(await getTranslations("TargetLabels"));
   const message =
     to === "taken"
-      ? `${row.name} is taken.`
+      ? t("movesToTaken", { name: row.name })
       : to === "withdrawn"
-        ? `${row.name}: withdrawal recorded.`
-        : `${row.name} moves to “${STATE_LABEL[to]}”.`;
+        ? t("movesToWithdrawn", { name: row.name })
+        : t("movesTo", { name: row.name, state: labels[to] });
 
   return done(previous, message, result);
 }
@@ -1345,14 +1348,17 @@ export async function rollbackTargetAction(
 
   refreshTree();
 
+  const t = await getTranslations("ActionMessages");
+  const labels = stateLabel(await getTranslations("TargetLabels"));
+
   const currencyNote =
     last.valueCents !== null
-      ? ` The ${formatEuros(last.valueCents, { decimals: "never" })} take leaves the signed total.`
+      ? t("currencyNote", { amount: formatEuros(last.valueCents, { decimals: "never" }) })
       : "";
 
   return done(
     previous,
-    `${record.name} goes back to “${STATE_LABEL[revertedTo]}”. The fact was erased from the log.${currencyNote}`,
+    t("revertedTo", { name: record.name, state: labels[revertedTo], currencyNote }),
     result,
   );
 }
@@ -1549,9 +1555,11 @@ export async function restoreTargetAction(
   };
 
   refreshTree();
+  const t = await getTranslations("ActionMessages");
+  const labels = stateLabel(await getTranslations("TargetLabels"));
   return done(
     previous,
-    `${record.name} is back on the map, in state “${STATE_LABEL[restored]}”.`,
+    t("restoredTo", { name: record.name, state: labels[restored] }),
     result,
   );
 }

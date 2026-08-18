@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Requirements } from "@/components/gate/Requirements";
 import {
@@ -19,6 +20,8 @@ import { INITIAL_RESET_STATE } from "./state";
 import styles from "@/components/gate/gate.module.css";
 
 export function ResetPassword({ token }: { token: string }) {
+  const t = useTranslations("ResetPassword");
+  const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
     resetPasswordAction,
     INITIAL_RESET_STATE,
@@ -41,7 +44,7 @@ export function ResetPassword({ token }: { token: string }) {
 
       <div className={styles.fields}>
         <Field>
-          <FieldLabel htmlFor="reset-password">New password</FieldLabel>
+          <FieldLabel htmlFor="reset-password">{t("newPassword")}</FieldLabel>
           <InputGroup>
             <InputGroupInput
               id="reset-password"
@@ -56,7 +59,7 @@ export function ResetPassword({ token }: { token: string }) {
             <InputGroupButton
               onClick={() => setVisible((was) => !was)}
               aria-pressed={visible}
-              aria-label={visible ? "Hide password" : "Show password"}
+              aria-label={visible ? common("hidePassword") : common("showPassword")}
             >
               {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
             </InputGroupButton>
@@ -72,7 +75,7 @@ export function ResetPassword({ token }: { token: string }) {
 
       <div style={{ marginTop: "24px" }}>
         <Button type="submit" variant="primary" fullWidth disabled={inProgress}>
-          {inProgress ? "Saving…" : "Set the new password"}
+          {inProgress ? t("saving") : t("submit")}
         </Button>
       </div>
     </form>

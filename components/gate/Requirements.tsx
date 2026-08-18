@@ -9,6 +9,8 @@
 // is an HTTP entry point that can be bypassed in one request. The two lists
 // must stay in agreement — change one, change the other.
 
+import { useTranslations } from "next-intl";
+
 import styles from "./requirements.module.css";
 
 /**
@@ -34,17 +36,18 @@ type Requirement = {
 };
 
 export function Requirements({ password, email }: RequirementsProps) {
+  const t = useTranslations("Requirements");
   const local = email.split("@")[0]?.trim().toLowerCase() ?? "";
 
   const requirements: Requirement[] = [
     {
       key: "length",
-      label: `${PASSWORD_MIN_CLIENT} characters or more`,
+      label: t("length", { min: PASSWORD_MIN_CLIENT }),
       met: password.length >= PASSWORD_MIN_CLIENT,
     },
     {
       key: "email",
-      label: "Does not contain your email address",
+      label: t("noEmail"),
       met:
         password.length > 0 &&
         (local.length < 4 || !password.toLowerCase().includes(local)),
@@ -66,7 +69,7 @@ export function Requirements({ password, email }: RequirementsProps) {
           {/* The label alone tells a screen reader nothing: the glyph carries
               the state, and a shape does not announce itself. */}
           <span className={styles.offScreen}>
-            {requirement.met ? " — met" : " — not met yet"}
+            {requirement.met ? t("met") : t("notMet")}
           </span>
         </li>
       ))}

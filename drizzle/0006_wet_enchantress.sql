@@ -1,0 +1,1 @@
+ALTER TABLE "account_settings" ADD COLUMN "locale" text DEFAULT 'fr' NOT NULL;

@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { accountSettings, db } from "@/lib/db";
 import { envPlacesKey } from "@/lib/sources/places";
 import { openStoredSecret, sealStoredSecret } from "@/lib/storedSecret";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/types";
 
 export type PlacesKeySource = "account" | "env" | null;
 
@@ -47,6 +48,26 @@ export async function savePlacesKey(
     .onConflictDoUpdate({
       target: accountSettings.ownerId,
       set: { googlePlacesKey: sealed, updatedAt: new Date() },
+    });
+}
+
+export async function getAccountLocale(ownerId: string): Promise<Locale> {
+  const [row] = await db
+    .select({ locale: accountSettings.locale })
+    .from(accountSettings)
+    .where(eq(accountSettings.ownerId, ownerId))
+    .limit(1);
+
+  return (row?.locale as Locale | undefined) ?? DEFAULT_LOCALE;
+}
+
+export async function saveLocale(ownerId: string, locale: Locale): Promise<void> {
+  await db
+    .insert(accountSettings)
+    .values({ ownerId, locale, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: accountSettings.ownerId,
+      set: { locale, updatedAt: new Date() },
     });
 }
 

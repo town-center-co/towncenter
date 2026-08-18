@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 
 import { Button } from "@/components/ui";
@@ -8,6 +9,7 @@ import { resetPriceGridAction } from "./actions";
 import { INITIAL_PRICE_GRID_STATE } from "./state";
 
 export function ResetGrid() {
+  const t = useTranslations("ResetGrid");
   const [state, action, inProgress] = useActionState(
     resetPriceGridAction,
     INITIAL_PRICE_GRID_STATE,
@@ -21,7 +23,7 @@ export function ResetGrid() {
         </p>
       ) : null}
       <Button type="submit" variant="quiet" size="compact" disabled={inProgress}>
-        {inProgress ? "Resetting…" : "Reset"}
+        {inProgress ? t("resetting") : t("reset")}
       </Button>
     </form>
   );

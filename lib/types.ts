@@ -265,6 +265,11 @@ export type ZoneStatus = (typeof ZONE_STATUSES)[number];
 export const USER_ROLES = ["owner", "member"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+// UI text only: number/date formatting stays pinned to French regardless of this setting.
+export const LOCALES = ["en", "fr"] as const;
+export type Locale = (typeof LOCALES)[number];
+export const DEFAULT_LOCALE: Locale = "fr";
+
 // Mirrors the Mollie subscription lifecycle; "pending" also covers a first
 // payment whose checkout was never completed. A missing row means "none".
 export const SUBSCRIPTION_STATUSES = [

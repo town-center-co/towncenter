@@ -17,14 +17,41 @@ import { CALIBRATION_MIN_OUTCOMES } from "@/lib/types";
 import { chosenSite, chosenPhone } from "./fields";
 import { fiveFacts } from "./facts";
 import {
-  STATE_LABEL,
-  EVENT_LABEL,
-  PROXIMITY_LABEL,
   distance,
   dateFromDay,
   longDate,
   formatNumber,
 } from "./text";
+import type { EventKind, TargetState } from "@/lib/types";
+
+// This export leaves the product for an agent to read, so it stays in a
+// single fixed language regardless of the UI locale — deliberately NOT
+// wired to next-intl (see `text.ts` for the UI-facing, locale-aware
+// versions of these same labels).
+const STATE_LABEL: Record<TargetState, string> = {
+  spotted: "Spotted",
+  studied: "Studied",
+  engaged: "Engaged",
+  taken: "Taken",
+  withdrawn: "Withdrawn",
+  dismissed: "Set aside",
+};
+
+const EVENT_LABEL: Record<EventKind, string> = {
+  survey: "Spotted",
+  study: "Study",
+  contact: "Call",
+  reply: "Reply",
+  take: "Taken",
+  withdrawal: "Withdrawn",
+};
+
+const PROXIMITY_LABEL: Record<string, string> = {
+  "same-street-capture": "Same street as a deal we took",
+  "near-live-deal": "Within 300 m of a live deal",
+  "in-zone": "No reference nearby",
+  "outside-zone": "Outside the worked sectors",
+};
 
 /**
  * A Markdown table cell, escaped.

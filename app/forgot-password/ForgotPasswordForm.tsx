@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Button, Field, FieldLabel, Input } from "@/components/ui";
 
@@ -10,6 +11,8 @@ import { INITIAL_FORGOT_STATE } from "./state";
 import styles from "@/components/gate/gate.module.css";
 
 export function ForgotPassword() {
+  const t = useTranslations("ForgotPassword");
+  const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
     forgotPasswordAction,
     INITIAL_FORGOT_STATE,
@@ -20,8 +23,7 @@ export function ForgotPassword() {
   if (state.done) {
     return (
       <p className={styles.notice} role="status">
-        If an account uses this address, a reset link is on its way. It works
-        once and expires in thirty minutes — check the spam folder too.
+        {t("done")}
       </p>
     );
   }
@@ -38,7 +40,7 @@ export function ForgotPassword() {
 
       <div className={styles.fields}>
         <Field>
-          <FieldLabel htmlFor="forgot-email">Email</FieldLabel>
+          <FieldLabel htmlFor="forgot-email">{common("email")}</FieldLabel>
           <Input
             id="forgot-email"
             name="email"
@@ -54,7 +56,7 @@ export function ForgotPassword() {
 
       <div style={{ marginTop: "24px" }}>
         <Button type="submit" variant="primary" fullWidth disabled={inProgress}>
-          {inProgress ? "Sending…" : "Send the reset link"}
+          {inProgress ? t("sending") : t("submit")}
         </Button>
       </div>
     </form>

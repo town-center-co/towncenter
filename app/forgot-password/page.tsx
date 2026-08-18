@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { Gate } from "@/components/gate/Gate";
 import { getUser } from "@/lib/accounts";
@@ -20,18 +21,19 @@ export const dynamic = "force-dynamic";
 export default async function ForgotPasswordPage() {
   if (await getUser()) redirect("/");
 
+  const t = await getTranslations("ForgotPasswordPage");
+
   return (
     <Gate
-      title="Locked out?"
-      subtitle="Give the address; if an account uses it, a reset link lands there."
-      toggle={
-        <>
-          Remembered it?{" "}
+      title={t("title")}
+      subtitle={t("subtitle")}
+      toggle={t.rich("toggle", {
+        link: (chunks) => (
           <Link href="/login" className={styles.link}>
-            Sign in
+            {chunks}
           </Link>
-        </>
-      }
+        ),
+      })}
     >
       <ForgotPassword />
     </Gate>

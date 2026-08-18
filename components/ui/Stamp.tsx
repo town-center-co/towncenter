@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 
 import { Button } from "./button";
 import { Loot } from "./Loot";
@@ -53,6 +54,7 @@ export function Stamp({
   durationMs = 1400,
   onClose,
 }: StampProps) {
+  const t = useTranslations("Stamp");
   const [mounted, setMounted] = useState(false);
   const [_reducedMotion, setReducedMotion] = useState(true);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -116,7 +118,7 @@ export function Stamp({
         className="stamp__card"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="t-label stamp__kind">{capture ? "Taken" : "Withdrawn"}</p>
+        <p className="t-label stamp__kind">{capture ? t("taken") : t("withdrawn")}</p>
 
         <p className="t-title-1 stamp__business">{business}</p>
 
@@ -129,15 +131,19 @@ export function Stamp({
           />
         ) : (
           <p className="t-body tone-2">
-            Spoils out of play{reason ? ` · ${reason}` : ""}
+            {reason ? t("spoilsOutOfPlayWithReason", { reason }) : t("spoilsOutOfPlay")}
           </p>
         )}
 
         {sector ? (
           <p className="t-body-s stamp__sector tnum">
             {capture
-              ? `${sector.name} ${sector.holdBefore} → ${percent(sector.holdAfter)}`
-              : `${sector.name} unchanged, ${percent(sector.holdAfter)}`}
+              ? t("sectorProgress", {
+                  name: sector.name,
+                  before: sector.holdBefore,
+                  after: percent(sector.holdAfter),
+                })
+              : t("sectorUnchanged", { name: sector.name, after: percent(sector.holdAfter) })}
           </p>
         ) : null}
 
@@ -148,7 +154,7 @@ export function Stamp({
           className="stamp__close"
           onClick={onClose}
         >
-          Close
+          {t("close")}
         </Button>
       </div>
     </div>

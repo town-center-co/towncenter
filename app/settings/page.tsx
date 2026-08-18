@@ -1,12 +1,19 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Badge, Button, Card, CardHeader, CardTitle } from "@/components/ui";
 import { requireUser } from "@/lib/accounts";
-import { getAccountPlacesKey, getPlacesKeySource, maskKey } from "@/lib/settings";
+import {
+  getAccountLocale,
+  getAccountPlacesKey,
+  getPlacesKeySource,
+  maskKey,
+} from "@/lib/settings";
 import type { ScoringFacts } from "@/lib/types";
 
 import { getPriceGrid } from "../queries";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { PlacesKeyForm } from "./PlacesKeyForm";
 import { removePlacesKeyAction } from "./actions";
 import { PriceGridForm } from "./PriceGridForm";
@@ -95,6 +102,7 @@ const WITNESSES: Record<string, { who: string; facts: ScoringFacts }> = {
 };
 
 async function ApiKeySection({ ownerId }: { ownerId: string }) {
+  const t = await getTranslations("ApiKeySection");
   const [source, key] = await Promise.all([
     getPlacesKeySource(ownerId),
     getAccountPlacesKey(ownerId),
@@ -104,11 +112,10 @@ async function ApiKeySection({ ownerId }: { ownerId: string }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Google Places</CardTitle>
+          <CardTitle>{t("title")}</CardTitle>
         </CardHeader>
         <p className="t-body">
-          The key is provided by the server environment
-          (<code>GOOGLE_PLACES_API_KEY</code>). Nothing to do here.
+          {t.rich("envKey", { code: (chunks) => <code>{chunks}</code> })}
         </p>
       </Card>
     );
@@ -118,14 +125,17 @@ async function ApiKeySection({ ownerId }: { ownerId: string }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Google Places</CardTitle>
+          <CardTitle>{t("title")}</CardTitle>
         </CardHeader>
         <p className="t-body">
-          Your key is configured: <code>{maskKey(key)}</code>.
+          {t.rich("configured", {
+            key: maskKey(key),
+            code: (chunks) => <code>{chunks}</code>,
+          })}
         </p>
         <form action={removePlacesKeyAction} className={styles.removeForm}>
           <Button type="submit" variant="quiet" size="compact">
-            Remove the key
+            {t("remove")}
           </Button>
         </form>
       </Card>
@@ -135,34 +145,31 @@ async function ApiKeySection({ ownerId }: { ownerId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Google Places</CardTitle>
+        <CardTitle>{t("title")}</CardTitle>
       </CardHeader>
-      <p className="t-body">
-        Enrichment needs a Google Places API key. Without it, the map still
-        works — surveying, scoring and the ledger need no key at all — but no
-        business will ever get a website address, and the in-house site audit
-        has nothing to read.
-      </p>
+      <p className="t-body">{t("needsKey")}</p>
       <PlacesKeyForm />
-      <p className="t-body-s tone-3">
-        Stored on this instance, used server-side only. One billed request is
-        made when you click &ldquo;Check the key&rdquo;.
-      </p>
+      <p className="t-body-s tone-3">{t("stored")}</p>
     </Card>
   );
 }
 
 export default async function SettingsPage() {
   const owner = await requireUser();
-  const grid = await getPriceGrid(owner);
+  const [grid, t] = await Promise.all([
+    getPriceGrid(owner),
+    getTranslations("SettingsPage"),
+  ]);
+  const locale = await getAccountLocale(owner.id);
 
   return (
     <main className="pricing">
       <header className="pricing__head">
-        <Badge asChild><h2>Settings</h2></Badge>
+        <Badge asChild><h2>{t("title")}</h2></Badge>
         <div className="pricing__head-act">
+          <LocaleSwitcher value={locale} />
           <Link className="t-body-s pricing__back" href={"/" as Route}>
-            {"Back to the map"}
+            {t("backToMap")}
           </Link>
         </div>
       </header>
@@ -175,7 +182,7 @@ export default async function SettingsPage() {
           often than the account's key — its own header keeps the two from
           reading as one form. */}
       <header className="pricing__head">
-        <Badge asChild><h2>Deal value grid</h2></Badge>
+        <Badge asChild><h2>{t("grid")}</h2></Badge>
         <div className="pricing__head-act">
           <ResetGrid />
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Loot, RollingAmount, Source, Badge } from "@/components/ui";
 import { formatEuros } from "@/lib/format";
@@ -22,6 +23,8 @@ function scoreUnder(grid: PriceGrid, sample: ScoringFacts) {
 const euros = (cents: number) => formatEuros(cents, { decimals: "never" });
 
 export function Witness({ who, sample, draft, saved }: WitnessProps) {
+  const t = useTranslations("Witness");
+  const tLoot = useTranslations("Loot");
   const [open, setOpen] = useState(false);
   const [lastReadable, setLastReadable] = useState<PriceGrid>(saved);
 
@@ -55,7 +58,7 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
         <span className="quote__toggle-who t-body-s">{who.split(" · ")[0]}</span>
         <span className="quote__toggle-sum tnum">
           {offGrid ? (
-            "Off-grid"
+            tLoot("offGrid")
           ) : (
             <RollingAmount cents={current.price.value12MonthsCents} />
           )}
@@ -87,7 +90,7 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
 
                 <div className="quote__line" data-soft>
                   <dt className="t-body-s">
-                    {`Hosting & upkeep, ${shown.valueHorizonMonths} months`}
+                    {t("hostingUpkeep", { months: shown.valueHorizonMonths })}
                   </dt>
                   <dd className="t-body-s tnum">
                     <RollingAmount cents={upkeepCents} />
@@ -106,7 +109,7 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
               </dl>
 
               <div className="quote__total">
-                <Badge>{`Worth over ${shown.valueHorizonMonths} months`}</Badge>
+                <Badge>{t("worthOver", { months: shown.valueHorizonMonths })}</Badge>
                 <Loot
                   cents={current.price.value12MonthsCents}
                   rolling
@@ -119,15 +122,15 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
 
           {holdingLastReadable ? (
             <p className="quote__foot t-body-s" role="status">
-              {"Last readable grid — a field is empty or out of range."}
+              {t("lastReadable")}
             </p>
           ) : (
             <p className="quote__foot t-body-s tnum">
               {delta !== 0
-                ? `${delta > 0 ? "▲ +" : "▼ −"}${euros(Math.abs(delta))} vs saved`
-                : "Matches the saved grid."}
+                ? `${delta > 0 ? "▲ +" : "▼ −"}${euros(Math.abs(delta))}` + t("vsSavedSuffix")
+                : t("matchesSaved")}
               {differsFromDefault
-                ? ` · default ${euros(fallback.price.value12MonthsCents)}`
+                ? t("defaultSuffix", { amount: euros(fallback.price.value12MonthsCents) })
                 : ""}
             </p>
           )}

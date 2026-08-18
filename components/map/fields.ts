@@ -6,13 +6,19 @@ import type { TargetRow } from "@/app/queries";
 import type { SourceKey } from "@/components/ui";
 import { formatEuros, formatRatingTenths } from "@/lib/format";
 
+import type { useTranslations } from "next-intl";
+
 import {
-  STATE_LABEL,
-  PROXIMITY_LABEL,
+  stateLabel,
+  proximityLabel,
   shortDate,
   dateFromDay,
   formatNumber,
 } from "./text";
+
+// See the note in `text.ts`: structurally compatible with both
+// `useTranslations` and `getTranslations`.
+type T = ReturnType<typeof useTranslations<"TargetLabels">>;
 
 /** The action that would fill a field. `kind` values are ASCII keys. */
 export type FieldAction =
@@ -386,7 +392,7 @@ function auditGroup(target: TargetRow): FieldGroup {
   };
 }
 
-function logGroup(target: TargetRow, entries: number): FieldGroup {
+function logGroup(target: TargetRow, entries: number, t: T): FieldGroup {
   return {
     key: "log",
     name: "Yours",
@@ -395,7 +401,7 @@ function logGroup(target: TargetRow, entries: number): FieldGroup {
       field(
         "state",
         "Approach state",
-        STATE_LABEL[target.state] ?? target.state,
+        stateLabel(t)[target.state] ?? target.state,
         ["log"],
         nothingToSay("Always set."),
       ),
@@ -423,7 +429,7 @@ function logGroup(target: TargetRow, entries: number): FieldGroup {
       field(
         "neighbourhood",
         "Neighbourhood",
-        PROXIMITY_LABEL[target.proximity] ?? target.proximity,
+        proximityLabel(t)[target.proximity] ?? target.proximity,
         ["computed"],
         nothingToSay("Computed from the businesses already surveyed around."),
       ),
@@ -435,12 +441,13 @@ function logGroup(target: TargetRow, entries: number): FieldGroup {
 export function fieldInventory(
   target: TargetRow,
   logEntries: number,
+  t: T,
 ): FieldGroup[] {
   return [
     registryGroup(target),
     googleGroup(target),
     auditGroup(target),
-    logGroup(target, logEntries),
+    logGroup(target, logEntries, t),
   ];
 }
 

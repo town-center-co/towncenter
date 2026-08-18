@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { Gate } from "@/components/gate/Gate";
 import { redirect } from "next/navigation";
@@ -22,6 +23,7 @@ export default async function SignUpPage() {
   if (await getUser()) redirect("/");
 
   const state = await signupState();
+  const t = await getTranslations("SignUpPage");
 
   // Closed, the page still exists and says why. A 404 would be quieter and
   // worse: whoever was given the address would hunt a broken link. This is
@@ -29,11 +31,11 @@ export default async function SignUpPage() {
   if (!state.open) {
     return (
       <Gate
-        title="Accounts are closed"
-        subtitle="This instance is not taking new accounts right now."
+        title={t("closedTitle")}
+        subtitle={t("closedSubtitle")}
         toggle={
           <Link href="/login" className={styles.link}>
-            Back to sign in
+            {t("backToSignIn")}
           </Link>
         }
       >
@@ -44,21 +46,18 @@ export default async function SignUpPage() {
 
   return (
     <Gate
-      title={state.isFirstAccount ? "Claim this instance" : "Create your account"}
-      subtitle={
-        state.isFirstAccount
-          ? "You are the first here. This account will own the territory."
-          : "One account, one territory. Nothing is shared between them."
-      }
+      title={state.isFirstAccount ? t("claimTitle") : t("createTitle")}
+      subtitle={state.isFirstAccount ? t("claimSubtitle") : t("createSubtitle")}
       toggle={
-        state.isFirstAccount ? null : (
-          <>
-            Already have an account?{" "}
-            <Link href="/login" className={styles.link}>
-              Sign in
-            </Link>
-          </>
-        )
+        state.isFirstAccount
+          ? null
+          : t.rich("toggle", {
+              link: (chunks) => (
+                <Link href="/login" className={styles.link}>
+                  {chunks}
+                </Link>
+              ),
+            })
       }
     >
       <SignUp isFirstAccount={state.isFirstAccount} />

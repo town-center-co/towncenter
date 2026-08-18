@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { CALIBRATION_MIN_OUTCOMES } from "@/lib/types";
 
 import { Gauge } from "./Gauge";
@@ -73,6 +75,17 @@ export type DifficultyProps = {
   className?: string;
 };
 
+// ASCII band key -> visible qualifier. Kept separate from `RESISTANCE_BANDS[].label`
+// (English, used as a fallback by callers that have not yet gone through
+// `useTranslations`) so this file can translate its own display without them.
+const BAND_LABEL_KEY: Record<BandKey, string> = {
+  easy: "easy",
+  approachable: "approachable",
+  solid: "solid",
+  hard: "hard",
+  impregnable: "impregnable",
+};
+
 export function Difficulty({
   resistance,
   issues = 0,
@@ -82,13 +95,15 @@ export function Difficulty({
   withoutQualifier = false,
   className,
 }: DifficultyProps) {
+  const t = useTranslations("Difficulty");
   const ratio = Number.isFinite(resistance) ? Math.min(1, Math.max(0, resistance)) : 0;
   const resistancePct = roundTo5(ratio * 100);
   const band = resistanceBand(resistancePct);
+  const qualifier = t(BAND_LABEL_KEY[band.key]);
 
   // Both wordings derive from the SAME rounding, so they stay complementary.
   const displayedPct = wording === "odds" ? 100 - resistancePct : resistancePct;
-  const metricName = wording === "odds" ? "Odds" : "Resistance";
+  const metricName = wording === "odds" ? t("metricOdds") : t("metricResistance");
 
   const calibrated = issues >= CALIBRATION_MIN_OUTCOMES;
 
@@ -101,12 +116,12 @@ export function Difficulty({
     <>
       {facts ? (
         <p className="t-body-s difficulty__caption">
-          Computed from {facts.available} of {facts.total} facts
+          {t("computedFrom", { available: facts.available, total: facts.total })}
         </p>
       ) : null}
       {calibrated ? null : (
         <p className="t-body-s difficulty__caption">
-          Estimate not calibrated (n = {issues})
+          {t("notCalibrated", { issues })}
         </p>
       )}
     </>
@@ -143,7 +158,7 @@ export function Difficulty({
             <span className="t-display tnum difficulty__value">{percent(displayedPct)}</span>
             <span className="t-label tone-2">{metricName}</span>
             {withoutQualifier ? null : (
-              <span className="t-body difficulty__qualifier">{band.label}</span>
+              <span className="t-body difficulty__qualifier">{qualifier}</span>
             )}
           </div>
         </div>
@@ -160,7 +175,7 @@ export function Difficulty({
           <span className="sr-only"> {metricName.toLowerCase()}</span>
         </span>
         {withoutQualifier ? null : (
-          <span className="t-body-s difficulty__qualifier">{band.label}</span>
+          <span className="t-body-s difficulty__qualifier">{qualifier}</span>
         )}
       </div>
       {/* No `name` or `valueText`: they are already in the header above, and
@@ -169,7 +184,7 @@ export function Difficulty({
         value={ratio}
         tint="var(--resistance-tint)"
         thickness="epaisse"
-        label={`Resistance: ${percent(resistancePct)}, ${band.label}`}
+        label={t("resistanceGaugeLabel", { pct: percent(resistancePct), qualifier })}
       />
       {captions}
     </div>

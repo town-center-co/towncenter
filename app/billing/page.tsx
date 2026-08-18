@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { Route } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { requireUser } from "@/lib/accounts";
 import { PRO_PLAN, TRIAL_DAYS } from "@/lib/billing/plans";
@@ -20,6 +21,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+type T = Awaited<ReturnType<typeof getTranslations>>;
+
 function formatDay(iso: string): string {
   return new Intl.DateTimeFormat(LOCALE, {
     timeZone: TIME_ZONE,
@@ -32,28 +35,18 @@ function first(value: string | string[] | undefined): string | null {
   return value ?? null;
 }
 
-const NOTICES: Record<string, { tone: "error" | "ok"; text: string }> = {
-  "error:checkout": {
-    tone: "error",
-    text: "The checkout could not be created. Try again, or come back later.",
-  },
-  "error:cancel": {
-    tone: "error",
-    text: "The cancellation did not go through. Try again, or come back later.",
-  },
-  "error:terms": {
-    tone: "error",
-    text: "Confirm the professional-use terms before starting the trial.",
-  },
-  "canceled:1": {
-    tone: "ok",
-    text: "Subscription canceled. Access stays open until the paid period ends.",
-  },
-};
-
 export default async function BillingPage(props: PageProps<"/billing">) {
   const owner = await requireUser();
   const facts = await getBillingFacts(owner);
+  const t = await getTranslations("BillingPage");
+  const shared = await getTranslations();
+
+  const NOTICES: Record<string, { tone: "error" | "ok"; text: string }> = {
+    "error:checkout": { tone: "error", text: t("noticeCheckoutError") },
+    "error:cancel": { tone: "error", text: t("noticeCancelError") },
+    "error:terms": { tone: "error", text: t("noticeTermsError") },
+    "canceled:1": { tone: "ok", text: t("noticeCanceled") },
+  };
 
   const params = await props.searchParams;
   const error = first(params.error);
@@ -68,10 +61,10 @@ export default async function BillingPage(props: PageProps<"/billing">) {
     <main className={styles.page}>
       <header className={styles.head}>
         <Badge asChild>
-          <h2>Billing</h2>
+          <h2>{t("title")}</h2>
         </Badge>
         <Link className={`t-body-s ${styles.back}`} href={"/" as Route}>
-          Back to the map
+          {shared("SettingsPage.backToMap")}
         </Link>
       </header>
 
@@ -81,65 +74,61 @@ export default async function BillingPage(props: PageProps<"/billing">) {
         </p>
       ) : null}
 
-      {facts.enabled ? <SaasBilling facts={facts} /> : <SelfHosted />}
+      {facts.enabled ? <SaasBilling facts={facts} t={t} shared={shared} /> : <SelfHosted t={t} />}
     </main>
   );
 }
 
-function SelfHosted() {
+function SelfHosted({ t }: { t: T }) {
   return (
     <Card className={styles.card}>
-      <h3 className={styles.cardTitle}>Self-hosted instance</h3>
+      <h3 className={styles.cardTitle}>{t("selfHostedTitle")}</h3>
       <p className="t-body">
-        Billing is not enabled here: no <code>MOLLIE_API_KEY</code>, no
-        subscription, and no quota — every limit below is off. This screen only
-        does something on the hosted service.
+        {t.rich("selfHostedBody", { code: (chunks) => <code>{chunks}</code> })}
       </p>
     </Card>
   );
 }
 
-function statusLine(facts: BillingFacts): string {
+function statusLine(facts: BillingFacts, t: T): string {
   const until = facts.periodEndIso ? formatDay(facts.periodEndIso) : null;
   const trialEnd = facts.trialEndsAtIso ? formatDay(facts.trialEndsAtIso) : null;
   const price = `€${PRO_PLAN.priceCents / 100}`;
 
   if (facts.state === "none") {
-    return facts.status === "pending"
-      ? "Checkout started but never completed. Start the trial to finish it."
-      : "No card on file yet. The trial starts the moment one is — nothing is charged today.";
+    return facts.status === "pending" ? t("statusNonePending") : t("statusNoneDefault");
   }
 
   if (facts.state === "trial") {
     if (facts.status === "canceled") {
       return trialEnd
-        ? `Trial canceled — access stays open until ${trialEnd}, and nothing will ever be charged.`
-        : "Trial canceled.";
+        ? t("statusTrialCanceledWithDate", { date: trialEnd })
+        : t("statusTrialCanceled");
     }
     return trialEnd
-      ? `Trial running — the first payment of ${price} goes out on ${trialEnd}. Cancel before then and nothing is charged.`
-      : "Trial running.";
+      ? t("statusTrialRunningWithDate", { date: trialEnd, price })
+      : t("statusTrialRunning");
   }
 
   if (facts.state === "expired") {
-    return "The trial or subscription has ended. Everything surveyed stays readable; subscribe to keep going.";
+    return t("statusExpired");
   }
 
   switch (facts.status) {
     case "active":
-      return until ? `Active — renews on ${until}.` : "Active.";
+      return until ? t("statusActiveWithDate", { date: until }) : t("statusActive");
     case "canceled":
-      return until ? `Canceled — access stays open until ${until}.` : "Canceled.";
+      return until ? t("statusCanceledWithDate", { date: until }) : t("statusCanceled");
     case "suspended":
-      return "A renewal payment failed and the subscription is suspended. Subscribe again to set up a new mandate.";
+      return t("statusSuspended");
     case "completed":
-      return "The subscription ran its course. Subscribe again to continue.";
+      return t("statusCompleted");
     default:
-      return "Active.";
+      return t("statusActive");
   }
 }
 
-function SaasBilling({ facts }: { facts: BillingFacts }) {
+function SaasBilling({ facts, t, shared }: { facts: BillingFacts; t: T; shared: T }) {
   const canSubscribe = facts.state === "none" || facts.state === "expired";
   const canCancel =
     facts.status === "active" &&
@@ -149,44 +138,41 @@ function SaasBilling({ facts }: { facts: BillingFacts }) {
 
   return (
     <>
-      {facts.testMode ? (
-        <p className={styles.testMode}>
-          Test mode: payments go through Mollie&rsquo;s sandbox, no real card is
-          charged.
-        </p>
-      ) : null}
+      {facts.testMode ? <p className={styles.testMode}>{t("testMode")}</p> : null}
 
       <Card className={styles.card}>
         <div className={styles.plan}>
           <span className={styles.planName}>{PRO_PLAN.name}</span>
           <span className={styles.price}>
             &euro;{PRO_PLAN.priceCents / 100}
-            <span className={styles.period}>/month</span>
+            <span className={styles.period}>{t("perMonth")}</span>
           </span>
         </div>
-        <p className="t-body-s tone-2">
-          {TRIAL_DAYS}-day free trial — card required, nothing charged until it
-          ends.
-        </p>
+        <p className="t-body-s tone-2">{t("trialNotice", { days: TRIAL_DAYS })}</p>
         <ul className={styles.limits}>
-          <li>{PRO_PLAN.limits.harvestedTargets.toLocaleString(LOCALE)} businesses harvested</li>
-          <li>{PRO_PLAN.limits.enrichments} Google Places enrichments</li>
-          <li>{PRO_PLAN.limits.siteAudits} site audits</li>
-          <li>{PRO_PLAN.limits.cumulativeAreaKm2} km&sup2; total surface</li>
-          <li>{MAX_ZONE_AREA_KM2} km&sup2; per zone</li>
+          <li>{shared("OnboardingPage.limitHarvested", { count: PRO_PLAN.limits.harvestedTargets.toLocaleString(LOCALE) })}</li>
+          <li>{shared("OnboardingPage.limitEnrichments", { count: PRO_PLAN.limits.enrichments })}</li>
+          <li>{shared("OnboardingPage.limitAudits", { count: PRO_PLAN.limits.siteAudits })}</li>
+          <li>{shared("OnboardingPage.limitArea", { count: PRO_PLAN.limits.cumulativeAreaKm2 })}</li>
+          <li>{shared("OnboardingPage.limitZoneArea", { count: MAX_ZONE_AREA_KM2 })}</li>
         </ul>
       </Card>
 
       <Card className={styles.card}>
-        <h3 className={styles.cardTitle}>Your subscription</h3>
-        <p className="t-body">{statusLine(facts)}</p>
+        <h3 className={styles.cardTitle}>{t("yourSubscription")}</h3>
+        <p className="t-body">{statusLine(facts, t)}</p>
         <p className="t-body-s tone-2">
-          {facts.usedKm2.toFixed(1)} of {facts.maxKm2} km&sup2; surveyed{" "}
-          {facts.current ? "this period" : "so far"} &middot;{" "}
-          {facts.usage.harvest.used.toLocaleString(LOCALE)} of{" "}
-          {facts.usage.harvest.limit.toLocaleString(LOCALE)} businesses &middot;{" "}
-          {facts.usage.enrich.used} of {facts.usage.enrich.limit} enrichments{" "}
-          &middot; {facts.usage.audit.used} of {facts.usage.audit.limit} audits
+          {t("usageLine", {
+            usedKm2: facts.usedKm2.toFixed(1),
+            maxKm2: facts.maxKm2,
+            period: facts.current ? t("surveyedThisPeriod") : t("surveyedSoFar"),
+            harvestUsed: facts.usage.harvest.used.toLocaleString(LOCALE),
+            harvestLimit: facts.usage.harvest.limit.toLocaleString(LOCALE),
+            enrichUsed: facts.usage.enrich.used,
+            enrichLimit: facts.usage.enrich.limit,
+            auditUsed: facts.usage.audit.used,
+            auditLimit: facts.usage.audit.limit,
+          })}
         </p>
 
         <div className={styles.actions}>
@@ -195,39 +181,34 @@ function SaasBilling({ facts }: { facts: BillingFacts }) {
               <label className={styles.acceptance}>
                 <input name="terms" type="checkbox" value="accepted" required />
                 <span>
-                  I am subscribing for professional use and accept the{" "}
-                  <a href="https://town-center.co/terms" target="_blank">
-                    terms of service
-                  </a>
-                  .
+                  {t.rich("acceptTerms", {
+                    link: (chunks) => (
+                      <a href="https://town-center.co/terms" target="_blank">
+                        {chunks}
+                      </a>
+                    ),
+                  })}
                 </span>
               </label>
               <Button type="submit" variant="primary">
                 {trialAvailable
-                  ? `Start the ${TRIAL_DAYS}-day free trial`
-                  : `Subscribe — €${PRO_PLAN.priceCents / 100}/month`}
+                  ? t("startTrial", { days: TRIAL_DAYS })
+                  : t("subscribe", { price: PRO_PLAN.priceCents / 100 })}
               </Button>
             </form>
           ) : null}
           {canCancel ? (
             <form action={cancelSubscriptionAction}>
               <Button type="submit" variant="quiet">
-                {facts.state === "trial"
-                  ? "Cancel the trial"
-                  : "Cancel the subscription"}
+                {facts.state === "trial" ? t("cancelTrial") : t("cancelSubscription")}
               </Button>
             </form>
           ) : null}
         </div>
 
         <p className="t-body-s tone-3">
-          {trialAvailable && canSubscribe
-            ? "A card is required to start the trial — €0.00 today, and the " +
-              "first payment only once the trial ends. "
-            : ""}
-          Payments are handled by Mollie. Cancel any time — access stays open
-          until the end of the paid period and your existing data stays
-          readable.
+          {trialAvailable && canSubscribe ? t("cardRequiredNotice") : ""}
+          {t("paymentsNotice")}
         </p>
       </Card>
     </>

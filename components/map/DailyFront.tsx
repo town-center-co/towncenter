@@ -7,6 +7,7 @@
 // `listFront` returns its `reason` in plain text and the screen displays it.
 
 import { useId, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import type { FrontLine } from "@/app/queries";
 import { Badge } from "@/components/ui";
@@ -42,6 +43,7 @@ export function DailyFront({
   onSelect,
   className,
 }: DailyFrontProps) {
+  const t = useTranslations("DailyFront");
   const overdue = rows.filter((row) => row.overdue).length;
 
   // Lateness decides the INITIAL state only. An effect reopening the panel
@@ -64,11 +66,11 @@ export function DailyFront({
         aria-controls={panelId}
         onClick={() => setOpen((state) => !state)}
       >
-        <Badge>Today</Badge>
+        <Badge>{t("today")}</Badge>
 
         <span className="t-body-s front__verbs tnum">
           {rows.length === 0 ? (
-            <span className="tone-2">nothing to do today</span>
+            <span className="tone-2">{t("nothingToday")}</span>
           ) : (
             verbs.map(({ verb, total }, index) => (
               <span key={verb}>
@@ -92,17 +94,10 @@ export function DailyFront({
 
       <div id={panelId} className="front__panel" hidden={!open}>
         {rows.length === 0 ? (
-          <p className="t-body-s tone-2">
-            Nothing waiting. Survey a sector, or mark the ones you have already
-            seen.
-          </p>
+          <p className="t-body-s tone-2">{t("emptyPanel")}</p>
         ) : (
           <>
-            <p className="t-body-s tone-3 front__what">
-              Where to start today, drawn from the whole territory — not from the
-              current view. Ordered by commercial urgency: a late follow-up comes
-              before a first call, even a cheaper one.
-            </p>
+            <p className="t-body-s tone-3 front__what">{t("whatText")}</p>
             <ol className="front__list">
               {rows.map((row, index) => {
                 const offGrid = row.target.score.price.kind === "off-grid";
@@ -125,7 +120,7 @@ export function DailyFront({
                       <span className="front__right">
                         <span className="t-title-3 tnum front__loot">
                           {offGrid
-                            ? "Off-grid"
+                            ? t("offGrid")
                             : formatEuros(
                                 row.target.score.price.value12MonthsCents,
                                 { decimals: "never" },

@@ -10,6 +10,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { WorldMap } from "./WorldMap";
 import townCentre from "./towncenter.png";
@@ -27,7 +28,9 @@ export type GateProps = {
   toggle?: React.ReactNode;
 };
 
-export function Gate({ title, subtitle, children, toggle }: GateProps) {
+export async function Gate({ title, subtitle, children, toggle }: GateProps) {
+  const t = await getTranslations("Gate");
+
   return (
     <main className={styles.frame}>
       <div className={styles.gate}>
@@ -45,7 +48,7 @@ export function Gate({ title, subtitle, children, toggle }: GateProps) {
           </div>
 
           <div className={styles.footerRule}>
-            <span>Neighbourhood prospecting, street by street.</span>
+            <span>{t("tagline")}</span>
           </div>
         </div>
 

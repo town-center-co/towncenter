@@ -58,13 +58,15 @@ import {
 } from "./fields";
 import { fiveFacts, recordedFacts } from "./facts";
 import { sheetAsMarkdown } from "./prompt";
+import { useTranslations } from "next-intl";
+
 import {
-  APPROACH,
+  approach,
   STEP_EVENT,
-  STATE_LABEL,
-  EVENT_LABEL,
-  ADVANCE_VERB,
-  STEP_VERB,
+  stateLabel,
+  eventLabel,
+  advanceVerb,
+  stepVerb,
   distance,
   shortDate,
   formatNumber,
@@ -103,6 +105,14 @@ export function TargetSheet({
   onSelect,
 }: TargetSheetProps) {
   const { target: target, log, neighbours } = detail;
+
+  const tLabels = useTranslations("TargetLabels");
+  const APPROACH = approach(tLabels);
+  const STATE_LABEL = stateLabel(tLabels);
+  const EVENT_LABEL = eventLabel(tLabels);
+  const ADVANCE_VERB = advanceVerb(tLabels);
+  const STEP_VERB = stepVerb(tLabels);
+  const tSheet = useTranslations("TargetSheet");
 
   const [advanceState, advance, advancePending] = useActionState(
     advanceTargetAction,
@@ -219,7 +229,7 @@ export function TargetSheet({
   const facts = fiveFacts(target);
   const available = recordedFacts(facts);
 
-  const groups = fieldInventory(target, log.length);
+  const groups = fieldInventory(target, log.length, tLabels);
   const counting = countFields(groups);
   const main = primaryFields(groups);
 
@@ -779,7 +789,10 @@ export function TargetSheet({
                     {lastEvent ? (
                       <>
                         <p className="t-body tnum">
-                          {`${EVENT_LABEL[lastEvent.kind]} on ${shortDate(lastEvent.occurredAt) ?? "?"}`}
+                          {tSheet("eventOnDate", {
+                            event: EVENT_LABEL[lastEvent.kind],
+                            date: shortDate(lastEvent.occurredAt) ?? "?",
+                          })}
                           {lastEvent.valueCents !== null
                             ? ` · ${formatEuros(lastEvent.valueCents, { decimals: "never" })}`
                             : ""}

@@ -4,6 +4,7 @@
 // an antivirus following page links would sign the user out without a click.
 
 import { useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 
 import { signOutAction } from "@/app/login/actions";
 import {
@@ -20,6 +21,7 @@ export type AccountRailProps = {
 };
 
 export function AccountRail({ account }: AccountRailProps) {
+  const t = useTranslations("Account");
   const name = account.displayName?.trim() || account.email;
 
   return (
@@ -28,7 +30,7 @@ export function AccountRail({ account }: AccountRailProps) {
         {name}
       </span>
       <button type="submit" className={styles.signout}>
-        Sign out
+        {t("signOut")}
       </button>
     </form>
   );
@@ -54,6 +56,7 @@ export function AccountMenu({ account }: AccountRailProps) {
 
 // Its own component: `useFormStatus` only reads the form of an ANCESTOR.
 function SignOutItem() {
+  const t = useTranslations("Account");
   const { pending } = useFormStatus();
 
   return (
@@ -64,7 +67,7 @@ function SignOutItem() {
         disabled={pending}
         onClick={(event) => event.currentTarget.form?.requestSubmit()}
       >
-        {pending ? "Signing out…" : "Sign out"}
+        {pending ? t("signingOut") : t("signOut")}
       </button>
     </DropdownMenuItem>
   );

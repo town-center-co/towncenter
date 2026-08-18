@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui";
 import { INITIAL_PLACES_KEY_STATE } from "./state";
@@ -15,6 +16,7 @@ export type PlacesKeyFormProps = {
 // two useActionState hooks: one for testing (no side effects), one for saving
 // (stays on the page and revalidates). Each button's formAction is its own dispatch.
 export function PlacesKeyForm({ defaultValue }: PlacesKeyFormProps) {
+  const t = useTranslations("PlacesKeyForm");
   const [key, setKey] = useState(defaultValue ?? "");
 
   const [testState, testDispatch, testPending] = useActionState(
@@ -34,7 +36,7 @@ export function PlacesKeyForm({ defaultValue }: PlacesKeyFormProps) {
   return (
     <form className={styles.keyForm}>
       <label className={styles.keyLabel} htmlFor="places-key">
-        Google Places API key
+        {t("label")}
       </label>
       <input
         id="places-key"
@@ -72,7 +74,7 @@ export function PlacesKeyForm({ defaultValue }: PlacesKeyFormProps) {
           formAction={testDispatch}
           disabled={testPending || savePending || key.length < 20}
         >
-          {testPending ? "Checking…" : "Check the key"}
+          {testPending ? t("checking") : t("check")}
         </Button>
         <Button
           type="submit"
@@ -80,7 +82,7 @@ export function PlacesKeyForm({ defaultValue }: PlacesKeyFormProps) {
           formAction={saveDispatch}
           disabled={savePending || testPending || key.length < 20}
         >
-          {savePending ? "Saving…" : "Save"}
+          {savePending ? t("saving") : t("save")}
         </Button>
       </div>
     </form>

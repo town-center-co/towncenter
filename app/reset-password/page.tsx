@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { Gate } from "@/components/gate/Gate";
 
@@ -21,42 +22,38 @@ export default async function ResetPasswordPage({
   searchParams: Promise<{ token?: string }>;
 }) {
   const { token } = await searchParams;
+  const t = await getTranslations("ResetPasswordPage");
 
   // No token, no form: posting without one can only fail, so say it up front.
   if (!token) {
     return (
       <Gate
-        title="This link is incomplete"
-        subtitle="A reset link carries its own key, and this one arrived without it."
-        toggle={
-          <>
-            Ask for a fresh one on{" "}
+        title={t("incompleteTitle")}
+        subtitle={t("incompleteSubtitle")}
+        toggle={t.rich("toggleIncomplete", {
+          link: (chunks) => (
             <Link href="/forgot-password" className={styles.link}>
-              the reset page
+              {chunks}
             </Link>
-          </>
-        }
+          ),
+        })}
       >
-        <p className={styles.notice}>
-          Links only live thirty minutes; the one in your most recent email is
-          the only one that counts.
-        </p>
+        <p className={styles.notice}>{t("expiredNotice")}</p>
       </Gate>
     );
   }
 
   return (
     <Gate
-      title="Choose a new password"
-      subtitle="The old one stops working the moment this one is saved."
-      toggle={
-        <>
-          Changed your mind?{" "}
+      title={t("title")}
+      subtitle={t("subtitle")}
+      toggle={t.rich("toggle", {
+        link: (chunks) => (
           <Link href="/login" className={styles.link}>
-            Back to sign-in
+            {chunks}
           </Link>
-        </>
-      }
+        ),
+      })}
     >
       <ResetPassword token={token} />
     </Gate>

@@ -7,6 +7,7 @@
 import "server-only";
 
 import { and, eq, gte, sql } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 
 import { db, targets } from "@/lib/db";
 
@@ -31,19 +32,19 @@ const LIMIT_BY_KIND: Record<QuotaKind, number> = {
   area: PRO_PLAN.limits.cumulativeAreaKm2,
 };
 
-const KIND_LABEL: Record<QuotaKind, string> = {
-  harvest: "businesses harvested",
-  enrich: "Google enrichments",
-  audit: "site audits",
-  area: "km² surveyed",
-};
+// Every caller here runs in a real request (a Server Action, a Server
+// Component read, or the `verify-actions.mts` bench, which stubs
+// `next/headers` with a working session) — never a request-less pure module —
+// so `getTranslations()` is always safe to call directly.
+export async function quotaStartTrialMessage(): Promise<string> {
+  const t = await getTranslations("Quotas");
+  return t("startTrial");
+}
 
-export const MESSAGE_START_TRIAL =
-  "Start your free trial on the Billing screen to begin surveying.";
-
-export const MESSAGE_EXPIRED =
-  "Your trial or subscription has ended. Subscribe on the Billing screen to " +
-  "keep going — everything already surveyed stays readable.";
+export async function quotaExpiredMessage(): Promise<string> {
+  const t = await getTranslations("Quotas");
+  return t("expired");
+}
 
 async function countUsage(
   kind: QuotaKind,
@@ -92,7 +93,7 @@ export async function checkQuotaWithState(
       allowed: false,
       used: 0,
       limit: LIMIT_BY_KIND[kind],
-      message: MESSAGE_START_TRIAL,
+      message: await quotaStartTrialMessage(),
     };
   }
 
@@ -102,7 +103,7 @@ export async function checkQuotaWithState(
       // all-time count: the billing page still shows what was surveyed.
       used: await countUsage(kind, ownerId, null),
       limit: LIMIT_BY_KIND[kind],
-      message: MESSAGE_EXPIRED,
+      message: await quotaExpiredMessage(),
     };
   }
 
@@ -111,13 +112,12 @@ export async function checkQuotaWithState(
 
   if (used < limit) return { allowed: true, used, limit, message: null };
 
+  const t = await getTranslations("Quotas");
   return {
     allowed: false,
     used,
     limit,
-    message:
-      `Quota reached: ${Math.round(used)} of ${limit} ${KIND_LABEL[kind]} ` +
-      "this period. Manage your plan on the Billing screen.",
+    message: t("reached", { used: Math.round(used), limit, kind }),
   };
 }
 

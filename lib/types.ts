@@ -184,7 +184,11 @@ export type PriceOffer =
   | "by-quote";
 
 export type PriceAdjustment = {
+  /** English, used by the "copy as prompt" export. */
   label: string;
+  /** Stable id for the UI to translate through `PriceReasons` messages. */
+  key: string;
+  params?: Record<string, string | number>;
   amountCents: number;
 };
 
@@ -198,8 +202,18 @@ export type PriceEstimate = {
   recurringCents: number;
   /** `priceCents + valueHorizonMonths * recurringCents`. */
   value12MonthsCents: number;
+  /** English, used by the "copy as prompt" export. */
   reason: string;
+  /** Stable id for the UI to translate through `PriceReasons` messages. */
+  reasonKey: string;
+  reasonParams?: Record<string, string | number>;
   adjustments: PriceAdjustment[];
+};
+
+/** `lootReason()`'s return: stable id + params, translated by the caller (never English on the wire). */
+export type LootReason = {
+  key: string;
+  params: Record<string, string | number>;
 };
 
 export type SuccessFactor = {

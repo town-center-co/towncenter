@@ -26,6 +26,7 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
   const t = useTranslations("Witness");
   const tLoot = useTranslations("Loot");
   const tOffer = useTranslations("PriceOffers");
+  const tReason = useTranslations("PriceReasons");
   const [open, setOpen] = useState(false);
   const [lastReadable, setLastReadable] = useState<PriceGrid>(saved);
 
@@ -78,7 +79,15 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
           </p>
 
           {offGrid ? (
-            <Loot cents={null} offGrid reason={current.price.reason} size="title" />
+            <Loot
+              cents={null}
+              offGrid
+              reason={tReason(
+                current.price.reasonKey as Parameters<typeof tReason>[0],
+                current.price.reasonParams,
+              )}
+              size="title"
+            />
           ) : (
             <>
               <dl className="quote__lines">
@@ -100,7 +109,9 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
 
                 {current.price.adjustments.map((item) => (
                   <div key={item.label} className="quote__line" data-soft>
-                    <dt className="t-body-s">{item.label}</dt>
+                    <dt className="t-body-s">
+                      {tReason(item.key as Parameters<typeof tReason>[0], item.params)}
+                    </dt>
                     <dd className="t-body-s tnum">
                       {item.amountCents >= 0 ? "+" : "−"}
                       <RollingAmount cents={Math.abs(item.amountCents)} />

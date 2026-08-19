@@ -117,6 +117,7 @@ export function TargetSheet({
   const tDifficulty = useTranslations("Difficulty");
   const tFactor = useTranslations("SuccessFactors");
   const tOffer = useTranslations("PriceOffers");
+  const tReason = useTranslations("PriceReasons");
 
   const [advanceState, advance, advancePending] = useActionState(
     advanceTargetAction,
@@ -536,7 +537,11 @@ export function TargetSheet({
               size="title"
               label={tSheet("spoilsOver12Months")}
               offGrid={offGrid}
-              reason={offGrid ? price.reason : null}
+              reason={
+                offGrid
+                  ? tReason(price.reasonKey as Parameters<typeof tReason>[0], price.reasonParams)
+                  : null
+              }
             />
             {/* The breakdown stays under the total: shown alone, the total sits
                 right below a chip announcing a different expected amount and
@@ -631,7 +636,10 @@ export function TargetSheet({
             {offGrid ? (
               <p className="sheet__alert t-body">
                 {tSheet.rich("offGridAlert", {
-                  reason: price.reason,
+                  reason: tReason(
+                    price.reasonKey as Parameters<typeof tReason>[0],
+                    price.reasonParams,
+                  ),
                   strong: (chunks) => <strong>{chunks}</strong>,
                 })}
                 <Source sourceKey="computed" />

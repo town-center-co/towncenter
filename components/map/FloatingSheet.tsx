@@ -36,6 +36,7 @@ export function FloatingSheet({
   onClose,
 }: FloatingSheetProps) {
   const t = useTranslations("FloatingSheet");
+  const tReason = useTranslations("PriceReasons");
   const target = detail.target;
   const offGrid = target.score.price.kind === "off-grid";
   const band = resistanceBand(target.resistancePercent);
@@ -81,7 +82,14 @@ export function FloatingSheet({
           recurringIncluded
           size="body"
           offGrid={offGrid}
-          reason={offGrid ? target.score.price.reason : null}
+          reason={
+            offGrid
+              ? tReason(
+                  target.score.price.reasonKey as Parameters<typeof tReason>[0],
+                  target.score.price.reasonParams,
+                )
+              : null
+          }
           label={t("spoils")}
         />
 

@@ -9,6 +9,7 @@
 import { formatEuros, formatPercent } from "@/lib/format";
 
 import type {
+  LootReason,
   PlaceScore,
   PriceAdjustment,
   PriceEstimate,
@@ -168,6 +169,8 @@ export function estimatePrice(
     return outOfGrid(
       "by-quote",
       `${knownAddresses} open establishments: the scope can only be quoted after seeing it, and the decision is not taken at the counter.`,
+      "reasonTooManyAddresses",
+      { count: knownAddresses },
     );
   }
 
@@ -175,24 +178,33 @@ export function estimatePrice(
     return outOfGrid(
       "to-qualify",
       "Online sales detected: this is no longer a storefront but a shop — different work, different price. To qualify by voice.",
+      "reasonOnlineSales",
     );
   }
 
   let offer: PriceOffer;
   let base: number;
   let reason: string;
+  let reasonKey: string;
+  let reasonParams: Record<string, string | number> | undefined;
 
   if (addresses >= 2) {
     offer = "multi-address";
     base = grid.multiAddressCents;
     reason = `${addresses} addresses to cover: one page per location and a structure that holds up.`;
+    reasonKey = "reasonMultiAddress";
+    reasonParams = { count: addresses };
   } else if (isComplexSite(site, grid)) {
     offer = "multi-page";
     base = grid.multiPageCents;
-    reason =
-      site?.onlineBooking === true
-        ? "Online booking to rebuild: this is no longer a storefront, it is a journey."
-        : `At least ${grid.complexSiteMinPages} pages: design weighs more than integration.`;
+    if (site?.onlineBooking === true) {
+      reason = "Online booking to rebuild: this is no longer a storefront, it is a journey.";
+      reasonKey = "reasonOnlineBooking";
+    } else {
+      reason = `At least ${grid.complexSiteMinPages} pages: design weighs more than integration.`;
+      reasonKey = "reasonManyPages";
+      reasonParams = { minPages: grid.complexSiteMinPages };
+    }
   } else if (
     facts.reviewCount !== null &&
     facts.reviewCount < grid.fewReviewsForBase &&
@@ -202,10 +214,12 @@ export function estimatePrice(
     base = grid.baseCents;
     reason =
       "One address, few reviews, no usable photo: the base tier is enough, and that is what makes it sellable.";
+    reasonKey = "reasonBaseTier";
   } else {
     offer = "full-site";
     base = grid.fullSiteCents;
     reason = "One address, a complete site: the offer that sells most often.";
+    reasonKey = "reasonFullSite";
   }
 
   const adjustments: PriceAdjustment[] = [];
@@ -217,6 +231,8 @@ export function estimatePrice(
     );
     adjustments.push({
       label: `${addresses - 2} extra address${addresses - 2 > 1 ? "es" : ""}`,
+      key: "extraAddresses",
+      params: { count: addresses - 2 },
       amountCents: amount,
     });
   }
@@ -224,6 +240,7 @@ export function estimatePrice(
   if (site?.onlineBooking === true && offer !== "multi-page") {
     adjustments.push({
       label: "Booking to integrate",
+      key: "bookingIntegration",
       amountCents: grid.bookingIntegrationCents,
     });
   }
@@ -231,6 +248,7 @@ export function estimatePrice(
   if (site?.usablePhotos === false && offer !== "base") {
     adjustments.push({
       label: "No usable photo",
+      key: "noUsablePhoto",
       amountCents: grid.noPhotoCents,
     });
   }
@@ -255,11 +273,18 @@ export function estimatePrice(
     recurringCents,
     value12MonthsCents: priceCents + grid.valueHorizonMonths * recurringCents,
     reason,
+    reasonKey,
+    reasonParams,
     adjustments,
   };
 }
 
-function outOfGrid(offer: PriceOffer, reason: string): PriceEstimate {
+function outOfGrid(
+  offer: PriceOffer,
+  reason: string,
+  reasonKey: string,
+  reasonParams?: Record<string, string | number>,
+): PriceEstimate {
   return {
     kind: "off-grid",
     offer,
@@ -267,6 +292,8 @@ function outOfGrid(offer: PriceOffer, reason: string): PriceEstimate {
     recurringCents: 0,
     value12MonthsCents: 0,
     reason,
+    reasonKey,
+    reasonParams,
     adjustments: [],
   };
 }
@@ -630,19 +657,24 @@ export function explainPlaceScore(score: PlaceScore): string {
 // a one-line reason for the loot figure, short enough for a list row or a map
 // card. An off-grid target is not a zero-euro one: its expectancy is zero by
 // construction, so the establishment count stands in for it instead.
+// Returns a key + params, never English text: this module cannot call
+// next-intl (see ARCHITECTURE.md), so the caller — always in real request
+// context — translates it before it reaches the wire.
 export function lootReason(
   score: PlaceScore,
   establishmentCount: number | null = null,
-): string {
+): LootReason {
   if (score.price.kind === "off-grid") {
-    const fact =
-      establishmentCount !== null && establishmentCount >= 2
-        ? `${establishmentCount} open establishments`
-        : "one address, scope to confirm";
-    return `off-grid · ${fact}`;
+    if (establishmentCount !== null && establishmentCount >= 2) {
+      return { key: "lootReasonOffGridMulti", params: { count: establishmentCount } };
+    }
+    return { key: "lootReasonOffGridSingle", params: {} };
   }
 
   const expectancy = formatEuros(score.expectancyCents, { decimals: "never" });
   const value = formatEuros(score.price.value12MonthsCents, { decimals: "never" });
-  return `expected ${expectancy} · ${score.success.percent} % of ${value}`;
+  return {
+    key: "lootReasonExpected",
+    params: { expectancy, percent: score.success.percent, value },
+  };
 }

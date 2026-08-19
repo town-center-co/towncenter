@@ -145,18 +145,30 @@ not change with the viewer's language preference either. The only English
 that survives untranslated on purpose is a proper noun (`Google Places`) or an
 acronym (`HTTPS`).
 
-**Known debt, not a pattern to extend:** `lib/scoring.ts`, `lib/harvest.ts`
-and `app/actions.ts` still return hardcoded English messages. They are not
-converted because `scripts/verify-actions.mts` and `verify-scoring.mts`
-assert those messages verbatim (`.startsWith("Unreadable sector")`,
-`.includes("already at this step")`) and run outside any Next.js request,
-where next-intl cannot be called at all. Fixing it means giving every message
-a stable key and rewriting those assertions to check keys instead of English
-substrings — tracked as its own follow-up. Until then, do not add *new*
-hardcoded strings to those three files on the assumption the debt already
-covers it; thread a translator through explicitly instead (see
-`app/queries.ts`'s `listFront()`, which already does this for the same
-files' neighbourhood).
+**`lib/scoring.ts` is the one module that can never call next-intl.** It is
+read by `scripts/verify-scoring.mts` outside any Next.js request, where
+`useTranslations`/`getTranslations` would throw. Every message it produces
+(`SuccessFactor`, `PriceEstimate.reason`/`reasonKey`/`reasonParams`,
+`PriceAdjustment`, `lootReason()`) therefore carries an English `label` (used
+only by the dev scripts and `components/map/prompt.ts`'s Markdown export)
+alongside a stable ASCII `key`/`params` pair that the UI translates —
+`SuccessFactors`, `PriceReasons`, `PriceOffers` in `messages/*.json`. Follow
+this split for any new message added there; do not call next-intl from this
+file even indirectly.
+
+`lib/harvest.ts`, `lib/billing/quotas.ts` and `app/actions.ts` are different:
+every caller is a real Server Action or a Server Component read, so they call
+`getTranslations()` directly (`scripts/verify-actions.mts` runs them through
+`bench-gate`, which stubs `next/headers` with a working session, so this is
+safe there too). A module-scope constant built at import time — before any
+request exists — cannot do this; wrap it in an `async function` that calls
+`getTranslations()` on demand instead (see `quotaStartTrialMessage()` /
+`messageNoKey()`). `ActionState.messageKey` carries a stable id alongside the
+translated `message` for exactly this reason: benches assert on
+`messageKey`, never on `message` text, since `message` is real locale-
+dependent copy. A zod schema's `message:` option is set at import time too —
+it holds one of `ZOD_MESSAGE_KEY`'s ids, never real text, translated in
+`fieldErrorsFrom` once a translator exists.
 
 **Keys are ASCII, labels are visible text, and the two never mix.** A key is a
 short, lowercase, space-free string: URL value, storage key, `data-*`

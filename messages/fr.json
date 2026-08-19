@@ -431,6 +431,14 @@
     "ageOver15Years": "Ancienneté : plus de 15 ans",
     "ageEstablished": "Ancienneté : établie"
   },
+  "PriceOffers": {
+    "base": "Palier de base",
+    "full-site": "Site complet",
+    "multi-page": "Site multi-pages",
+    "multi-address": "Site multi-adresses",
+    "to-qualify": "À qualifier",
+    "by-quote": "Sur devis"
+  },
   "TargetList": {
     "offGrid": "Hors grille",
     "resistanceSuffix": " résistance, {band}",

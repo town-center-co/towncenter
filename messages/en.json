@@ -431,6 +431,14 @@
     "ageOver15Years": "Age: over 15 years",
     "ageEstablished": "Age: established"
   },
+  "PriceOffers": {
+    "base": "Base tier",
+    "full-site": "Full site",
+    "multi-page": "Multi-page site",
+    "multi-address": "Multi-address site",
+    "to-qualify": "To qualify",
+    "by-quote": "By quote"
+  },
   "TargetList": {
     "offGrid": "Off-grid",
     "resistanceSuffix": " resistance, {band}",

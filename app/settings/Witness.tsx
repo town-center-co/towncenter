@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Loot, RollingAmount, Source, Badge } from "@/components/ui";
 import { formatEuros } from "@/lib/format";
 import { DEFAULT_PRICE_GRID } from "@/lib/priceGrid";
-import { PRICE_OFFER_LABELS, scorePlace } from "@/lib/scoring";
+import { scorePlace } from "@/lib/scoring";
 import type { PriceGrid, ScoringFacts } from "@/lib/types";
 
 export type WitnessProps = {
@@ -25,6 +25,7 @@ const euros = (cents: number) => formatEuros(cents, { decimals: "never" });
 export function Witness({ who, sample, draft, saved }: WitnessProps) {
   const t = useTranslations("Witness");
   const tLoot = useTranslations("Loot");
+  const tOffer = useTranslations("PriceOffers");
   const [open, setOpen] = useState(false);
   const [lastReadable, setLastReadable] = useState<PriceGrid>(saved);
 
@@ -82,7 +83,7 @@ export function Witness({ who, sample, draft, saved }: WitnessProps) {
             <>
               <dl className="quote__lines">
                 <div className="quote__line">
-                  <dt className="t-body-s">{PRICE_OFFER_LABELS[current.price.offer]}</dt>
+                  <dt className="t-body-s">{tOffer(current.price.offer)}</dt>
                   <dd className="t-body-s tnum">
                     <RollingAmount cents={current.price.priceCents} />
                   </dd>

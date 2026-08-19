@@ -47,7 +47,6 @@ import {
   type SourceKey,
 } from "@/components/ui";
 import { formatEuros } from "@/lib/format";
-import { PRICE_OFFER_LABELS } from "@/lib/scoring";
 import { TARGET_STATE_RANK, type TargetState } from "@/lib/types";
 
 import {
@@ -117,6 +116,7 @@ export function TargetSheet({
   const tFacts = useTranslations("Facts");
   const tDifficulty = useTranslations("Difficulty");
   const tFactor = useTranslations("SuccessFactors");
+  const tOffer = useTranslations("PriceOffers");
 
   const [advanceState, advance, advancePending] = useActionState(
     advanceTargetAction,
@@ -740,7 +740,7 @@ export function TargetSheet({
                   figure in two places. */}
               {offGrid ? null : (
                 <p className="t-body-s tone-2">
-                  {tSheet("offerRetained", { offer: PRICE_OFFER_LABELS[price.offer] })}
+                  {tSheet("offerRetained", { offer: tOffer(price.offer) })}
                   <Source sourceKey="computed" />
                 </p>
               )}

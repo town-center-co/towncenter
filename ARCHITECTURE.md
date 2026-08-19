@@ -130,12 +130,15 @@ as to a human's. The locale is a stored per-account preference
 URL segment and there must not be one; see `i18n/request.ts` for how the
 locale is resolved per request.
 
-A pure module that a non-request context also reads — `scripts/*.mts`, or
+A pure module read from outside React — `components/map/facts.ts`, feeding
 `components/map/prompt.ts`'s Markdown export, which is deliberately English
 regardless of the UI locale (see its own header comment) — takes its
-translator as an explicit parameter (built with `createTranslator` where no
-request exists) rather than calling `useTranslations`/`getTranslations`
-itself, which requires request context and throws without it.
+translator as an explicit parameter, typed to accept either
+`useTranslations` (the real UI, inside a component) or `createTranslator`
+(`prompt.ts`, which runs from an event handler outside any component render
+and builds its own). `scripts/*.mts` are different: `bench-gate-hooks.mjs`
+gives them a real, working `getTranslations()` (see below) — they call it
+directly like a Server Action does, never building their own translator.
 
 `lib/format.ts` is pinned to `fr-FR` / `Europe/Paris` and does not move
 regardless of UI language: the locale is frozen so server and client renders

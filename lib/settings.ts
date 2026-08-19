@@ -8,7 +8,11 @@ import { eq } from "drizzle-orm";
 import { accountSettings, db } from "@/lib/db";
 import { envPlacesKey } from "@/lib/sources/places";
 import { openStoredSecret, sealStoredSecret } from "@/lib/storedSecret";
-import { DEFAULT_LOCALE, type Locale } from "@/lib/types";
+import { DEFAULT_LOCALE, LOCALES, type Locale } from "@/lib/types";
+
+function isLocale(value: string): value is Locale {
+  return (LOCALES as readonly string[]).includes(value);
+}
 
 export type PlacesKeySource = "account" | "env" | null;
 
@@ -51,6 +55,11 @@ export async function savePlacesKey(
     });
 }
 
+// Not just a cast: `locale` is a plain `text` column, no DB CHECK constraint
+// backs the enum (Drizzle's `{ enum: LOCALES }` is TypeScript-only). A stray
+// value from any writer other than `saveLocale` would otherwise crash every
+// render for that account — `i18n/request.ts` imports
+// `../messages/${locale}.json` directly, and an unknown locale has no file.
 export async function getAccountLocale(ownerId: string): Promise<Locale> {
   const [row] = await db
     .select({ locale: accountSettings.locale })
@@ -58,7 +67,8 @@ export async function getAccountLocale(ownerId: string): Promise<Locale> {
     .where(eq(accountSettings.ownerId, ownerId))
     .limit(1);
 
-  return (row?.locale as Locale | undefined) ?? DEFAULT_LOCALE;
+  if (row?.locale && isLocale(row.locale)) return row.locale;
+  return DEFAULT_LOCALE;
 }
 
 export async function saveLocale(ownerId: string, locale: Locale): Promise<void> {

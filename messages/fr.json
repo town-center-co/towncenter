@@ -57,7 +57,8 @@
     "accountNotCreated": "Compte non créé. Réessayez.",
     "emailRequired": "Saisissez une adresse e-mail.",
     "emailTaken": "Un compte utilise déjà cette adresse. Connectez-vous plutôt.",
-    "invalidResetLink": "Ce lien est invalide ou a expiré. Demandez-en un nouveau depuis la page de connexion."
+    "invalidResetLink": "Ce lien est invalide ou a expiré. Demandez-en un nouveau depuis la page de connexion.",
+    "displayNameTooLong": "{max} caractères maximum."
   },
   "PasswordRefusal": {
     "short": "{min} caractères minimum — c’est la longueur qui protège, pas les symboles.",
@@ -396,7 +397,14 @@
     "unreadableIdentifier": "Identifiant illisible.",
     "unreadableNafCode": "Code NAF illisible.",
     "valueTooLong": "500 caractères au maximum.",
-    "labelTooLong": "120 caractères au maximum."
+    "labelTooLong": "120 caractères au maximum.",
+    "unreadableCoordinate": "Coordonnée illisible.",
+    "unreadableContour": "Contour illisible.",
+    "unreadablePageNumber": "Numéro de page illisible.",
+    "unreadableDestination": "Étape de destination illisible.",
+    "amountOutOfRange": "Montant hors plage autorisée.",
+    "noteTooLong": "2 000 caractères au maximum.",
+    "invalidValue": "Valeur invalide."
   },
   "TargetSheet": {
     "eventOnDate": "{event} le {date}",

@@ -57,7 +57,8 @@
     "accountNotCreated": "Account not created. Try again.",
     "emailRequired": "Enter an email address.",
     "emailTaken": "An account already uses this address. Sign in instead.",
-    "invalidResetLink": "This link is invalid or has expired. Request a new one from the sign-in page."
+    "invalidResetLink": "This link is invalid or has expired. Request a new one from the sign-in page.",
+    "displayNameTooLong": "{max} characters at most."
   },
   "PasswordRefusal": {
     "short": "At least {min} characters — length is what protects you, not symbols.",
@@ -396,7 +397,14 @@
     "unreadableIdentifier": "Unreadable identifier.",
     "unreadableNafCode": "Unreadable NAF code.",
     "valueTooLong": "500 characters at most.",
-    "labelTooLong": "120 characters at most."
+    "labelTooLong": "120 characters at most.",
+    "unreadableCoordinate": "Unreadable coordinate.",
+    "unreadableContour": "Unreadable outline.",
+    "unreadablePageNumber": "Unreadable page number.",
+    "unreadableDestination": "Unreadable destination step.",
+    "amountOutOfRange": "Amount out of range.",
+    "noteTooLong": "2 000 characters at most.",
+    "invalidValue": "Invalid value."
   },
   "TargetSheet": {
     "eventOnDate": "{event} on {date}",

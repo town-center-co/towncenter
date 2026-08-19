@@ -326,7 +326,15 @@ export type HarvestSliceRequest = {
 
 /** Serializable: never an `Error`. */
 export type HarvestFailure = {
+  /** Translated, for the immediate toast — never persisted as-is. */
   message: string;
+  /**
+   * Stable id for `zones.error`, which has no locale of its own: a value
+   * read back next week, or by a viewer on a different locale, must not be
+   * frozen to whoever's session wrote it. `null` for a `SireneError`, which
+   * carries its own (English, third-party) text with no key to give it.
+   */
+  messageKey: string | null;
   retryable: boolean;
   /** Everything before it is stored. */
   page: number;
@@ -443,6 +451,7 @@ export async function harvestSlice(
       failure = {
         message:
           error instanceof SireneError ? error.message : t("registerDidNotAnswer"),
+        messageKey: error instanceof SireneError ? null : "registerDidNotAnswer",
         retryable: error instanceof SireneError ? error.retryable : true,
         page,
       };
@@ -473,6 +482,7 @@ export async function harvestSlice(
       // a failed write is not retryable: insisting would only burn quota.
       failure = {
         message: t("couldNotSave"),
+        messageKey: "couldNotSave",
         retryable: false,
         page,
       };
@@ -518,7 +528,12 @@ export async function harvestSlice(
   }
 
   if (failure) {
-    await closeZone(request.zoneId, { status: "failed", error: failure.message });
+    await closeZone(request.zoneId, {
+      status: "failed",
+      // the stable key when there is one, never the translated toast text —
+      // `zones.error` has no locale of its own.
+      error: failure.messageKey ?? failure.message,
+    });
   } else if (done) {
     await closeZone(request.zoneId, { status: "done" });
   }

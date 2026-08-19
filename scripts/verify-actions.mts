@@ -9,6 +9,7 @@
 // runnable twice in a row.
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { and, eq, or, sql } from "drizzle-orm";
 
@@ -92,6 +93,19 @@ function check(title: string, condition: boolean, detail = ""): void {
     failures += 1;
     console.error(`✘ ${title.padEnd(58)} ${detail}`);
   }
+}
+
+// The bench asserts on `messageKey`, never on translated `message` text — but
+// a key match alone would not catch a garbled or emptied-out translation.
+// This reads the actual JSON content directly, independent of which locale
+// the bench session happens to be on, so the wording itself stays covered.
+function messageInLocale(locale: "en" | "fr", key: string): string {
+  const messages = JSON.parse(
+    readFileSync(new URL(`../messages/${locale}.json`, import.meta.url), "utf8"),
+  ) as { ActionMessages: Record<string, string> };
+  const value = messages.ActionMessages[key];
+  if (value === undefined) throw new Error(`No ActionMessages.${key} in ${locale}.json`);
+  return value;
 }
 
 // The test frame, deliberately far OVER the survey area ceiling: a frame small
@@ -1107,9 +1121,16 @@ async function main() {
     form({ frame: JSON.stringify(FRAME) }),
   );
   check(
-    "enriching a frame without a key refuses cleanly, with guidance",
+    "enriching a frame without a key refuses cleanly",
     enrichFrame.status === "error" && enrichFrame.messageKey === "noGoogleKey",
     "no throw, no half-written record",
+  );
+  check(
+    "…and the message says what to do about it, in both locales",
+    messageInLocale("en", "noGoogleKey").includes("GOOGLE_PLACES_API_KEY") &&
+      messageInLocale("en", "noGoogleKey").includes("Set GOOGLE_PLACES_API_KEY") &&
+      messageInLocale("fr", "noGoogleKey").includes("GOOGLE_PLACES_API_KEY"),
+    "no bare env var name with no instruction",
   );
 
   const enrichBadFrame = await enrichZoneAction(

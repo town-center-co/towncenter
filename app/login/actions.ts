@@ -53,7 +53,10 @@ function signUpSchema(t: Awaited<ReturnType<typeof getTranslations>>) {
         message: t("AuthActions.invalidEmail"),
       }),
     password: z.string().min(1, t("AuthActions.choosePassword")).max(PASSWORD_MAX),
-    displayName: z.string().max(120).optional(),
+    displayName: z
+      .string()
+      .max(120, t("AuthActions.displayNameTooLong", { max: 120 }))
+      .optional(),
   });
 }
 

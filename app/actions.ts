@@ -191,7 +191,15 @@ function fieldErrorsFrom(error: z.ZodError, t: ActionMessagesT): Record<string, 
   const out: Record<string, string> = {};
   for (const issue of error.issues) {
     const key = String(issue.path[0] ?? "_");
-    if (!(key in out)) out[key] = t(issue.message as Parameters<typeof t>[0]);
+    if (key in out) continue;
+    // Every schema below sets `message:` to one of ZOD_MESSAGE_KEY's values.
+    // A validator that forgot to would leak zod's own English text
+    // ("Too big: expected number to be <=90") straight into `t()` as if it
+    // were a key — this falls back to a generic translated message instead
+    // of surfacing that as literal untranslated garbage in the UI.
+    out[key] = ZOD_MESSAGE_KEY_SET.has(issue.message)
+      ? t(issue.message as Parameters<typeof t>[0])
+      : t("invalidValue");
   }
   return out;
 }
@@ -202,7 +210,14 @@ const ZOD_MESSAGE_KEY = {
   unreadableNafCode: "unreadableNafCode",
   valueTooLong: "valueTooLong",
   labelTooLong: "labelTooLong",
+  unreadableCoordinate: "unreadableCoordinate",
+  unreadableContour: "unreadableContour",
+  unreadablePageNumber: "unreadablePageNumber",
+  unreadableDestination: "unreadableDestination",
+  amountOutOfRange: "amountOutOfRange",
+  noteTooLong: "noteTooLong",
 } as const;
+const ZOD_MESSAGE_KEY_SET: ReadonlySet<string> = new Set(Object.values(ZOD_MESSAGE_KEY));
 
 // A row id is a crypto.randomUUID(). Checked here and not only by the `where`:
 // an action is a public POST endpoint, and an arbitrary string has no business
@@ -213,21 +228,27 @@ const idSchema = z
     message: ZOD_MESSAGE_KEY.unreadableIdentifier,
   });
 
+const coordinate = () =>
+  z.number({ message: ZOD_MESSAGE_KEY.unreadableCoordinate });
+
 const bboxSchema = z.object({
-  minLat: z.number().min(-90).max(90),
-  maxLat: z.number().min(-90).max(90),
-  minLng: z.number().min(-180).max(180),
-  maxLng: z.number().min(-180).max(180),
+  minLat: coordinate().min(-90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  maxLat: coordinate().min(-90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  minLng: coordinate().min(-180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  maxLng: coordinate().min(-180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
 });
 
 const latLngSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+  lat: coordinate().min(-90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  lng: coordinate().min(-180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
 });
 
 // Hand-drawn outline. Three vertices minimum, and the 2 000 ceiling is not
 // cosmetic: every vertex is tested against every business in the frame.
-const polygonSchema = z.array(latLngSchema).min(3).max(2_000);
+const polygonSchema = z
+  .array(latLngSchema, { message: ZOD_MESSAGE_KEY.unreadableContour })
+  .min(3, { message: ZOD_MESSAGE_KEY.unreadableContour })
+  .max(2_000, { message: ZOD_MESSAGE_KEY.unreadableContour });
 
 /** NAF 2008 codes, e.g. `56.10A`. The API rejects NAF 2025 codes. */
 const nafSchema = z
@@ -242,9 +263,14 @@ const surveySchema = z.object({
   frame: bboxSchema.optional(),
   contour: polygonSchema.nullish(),
   naf: nafSchema.nullish(),
-  label: z.string().max(120).nullish(),
+  label: z.string().max(120, { message: ZOD_MESSAGE_KEY.labelTooLong }).nullish(),
   zoneId: idSchema.nullish(),
-  page: z.number().int().min(1).max(10_000).nullish(),
+  page: z
+    .number({ message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .int({ message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .min(1, { message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .max(10_000, { message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .nullish(),
 });
 
 const frameSchema = z.object({ frame: bboxSchema });
@@ -270,9 +296,16 @@ const renameSchema = z.object({
 // never returned to; `dismissed` belongs to dismissTargetAction, not here.
 const advanceSchema = z.object({
   id: idSchema,
-  to: z.enum(["studied", "engaged", "taken", "withdrawn"]),
-  amountCents: z.number().int().min(0).max(1_000_000_000).nullish(),
-  note: z.string().max(2_000).nullish(),
+  to: z.enum(["studied", "engaged", "taken", "withdrawn"], {
+    message: ZOD_MESSAGE_KEY.unreadableDestination,
+  }),
+  amountCents: z
+    .number({ message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .int({ message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .min(0, { message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .max(1_000_000_000, { message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .nullish(),
+  note: z.string().max(2_000, { message: ZOD_MESSAGE_KEY.noteTooLong }).nullish(),
 });
 
 /**

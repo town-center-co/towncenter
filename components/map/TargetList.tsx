@@ -7,7 +7,7 @@
 import { useTranslations } from "next-intl";
 
 import type { TargetRow } from "@/app/queries";
-import { Badge, percent, resistanceBand } from "@/components/ui";
+import { Badge, percent, resistanceBand, BAND_LABEL_KEY } from "@/components/ui";
 import { formatEuros } from "@/lib/format";
 
 import { stateLabel } from "./text";
@@ -46,6 +46,7 @@ function Row({
 }) {
   const t = useTranslations("TargetList");
   const tLabels = useTranslations("TargetLabels");
+  const tDifficulty = useTranslations("Difficulty");
   const offGrid = target.score.price.kind === "off-grid";
   const band = resistanceBand(target.resistancePercent);
   const address = [target.address, target.city].filter(Boolean).join(" · ");
@@ -87,7 +88,9 @@ function Row({
             data-band={band.key}
           >
             {percent(target.resistancePercent)}
-            <span className="sr-only">{t("resistanceSuffix", { band: band.label })}</span>
+            <span className="sr-only">
+              {t("resistanceSuffix", { band: tDifficulty(BAND_LABEL_KEY[band.key]) })}
+            </span>
           </span>
         </span>
       </button>

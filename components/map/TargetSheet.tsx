@@ -1065,7 +1065,7 @@ export function TargetSheet({
               <ul className="sheet__factors panel">
                 {success.factors.map((factor, index) => (
                   <li
-                    key={`${factor.label}-${index}`}
+                    key={`${factor.key}-${index}`}
                     className="sheet__factor"
                     data-weight={
                       factor.value === 0

@@ -7,7 +7,14 @@
 import { useTranslations } from "next-intl";
 
 import type { TargetDetail } from "@/app/queries";
-import { Button, Loot, Badge, percent, resistanceBand } from "@/components/ui";
+import {
+  Button,
+  Loot,
+  Badge,
+  percent,
+  resistanceBand,
+  BAND_LABEL_KEY,
+} from "@/components/ui";
 
 export type FloatingSheetProps = {
   detail: TargetDetail;
@@ -37,6 +44,7 @@ export function FloatingSheet({
 }: FloatingSheetProps) {
   const t = useTranslations("FloatingSheet");
   const tReason = useTranslations("PriceReasons");
+  const tDifficulty = useTranslations("Difficulty");
   const target = detail.target;
   const offGrid = target.score.price.kind === "off-grid";
   const band = resistanceBand(target.resistancePercent);
@@ -99,7 +107,7 @@ export function FloatingSheet({
           <span className="t-title-3 tnum floating__rate">
             {percent(target.resistancePercent)}
           </span>
-          <span className="t-body-s tone-2">{band.label}</span>
+          <span className="t-body-s tone-2">{tDifficulty(BAND_LABEL_KEY[band.key])}</span>
         </div>
       </div>
 

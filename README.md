@@ -31,7 +31,7 @@ Node 22+, Docker for the local database.
 ## Quick start
 
 ```bash
-git clone https://github.com/fberrez/towncenter.git
+git clone https://github.com/town-center-co/towncenter.git
 cd towncenter
 npm install
 
@@ -125,7 +125,7 @@ npm run build
 Benches and pull request rules: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 Conventions invisible to `tsc` and the build:
 [`ARCHITECTURE.md`](ARCHITECTURE.md). Security reports:
-[private vulnerability reporting](https://github.com/fberrez/towncenter/security/advisories/new),
+[private vulnerability reporting](https://github.com/town-center-co/towncenter/security/advisories/new),
 never a public issue.
 
 ---

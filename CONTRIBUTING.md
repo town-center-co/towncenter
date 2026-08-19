@@ -182,7 +182,7 @@ Each cost a real bug; all are documented at length in
   — `db:push` is a local convenience, `npm start` applies the committed
   migrations.
 - Bugs and features through issues; security through
-  [private vulnerability reporting](https://github.com/fberrez/towncenter/security/advisories/new),
+  [private vulnerability reporting](https://github.com/town-center-co/towncenter/security/advisories/new),
   never a public issue.
 
 By contributing you agree your changes are licensed under the

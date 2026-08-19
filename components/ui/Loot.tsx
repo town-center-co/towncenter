@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { formatEuros, type EurosOptions } from "@/lib/format";
 
 import { Badge } from "./badge";
@@ -46,6 +48,7 @@ export function Loot({
   decimals = "never",
   className,
 }: LootProps) {
+  const t = useTranslations("Loot");
   const sizeClass = SIZE_CLASS[size];
   const unknown = cents === null || cents === undefined || !Number.isFinite(cents);
 
@@ -57,17 +60,15 @@ export function Loot({
 
       {offGrid ? (
         <>
-          <span className="loot__off-grid">Off-grid</span>
-          <span className="t-body-s tone-2">
-            {nonBreaking(reason ?? "The work goes beyond the default offer: to price by hand.")}
-          </span>
+          <span className="loot__off-grid">{t("offGrid")}</span>
+          <span className="t-body-s tone-2">{nonBreaking(reason ?? t("priceByHand"))}</span>
         </>
       ) : unknown ? (
         <>
-          <span className={cx(sizeClass, "tone-2")} aria-label="amount unknown">
+          <span className={cx(sizeClass, "tone-2")} aria-label={t("amountUnknown")}>
             —
           </span>
-          <span className="t-body-s tone-2">{nonBreaking(reason ?? "Not priced")}</span>
+          <span className="t-body-s tone-2">{nonBreaking(reason ?? t("notPriced"))}</span>
         </>
       ) : (
         <>
@@ -83,10 +84,10 @@ export function Loot({
           Number.isFinite(recurringCents) ? (
             <span className="t-body-s tnum">
               <span className="loot__recurring">
-                {recurringIncluded ? "incl. " : "+ "}
+                {recurringIncluded ? t("included") : t("plus")}
                 {formatEuros(recurringCents, { decimals: "never" })}
               </span>
-              <span className="loot__recurring-unit">/month</span>
+              <span className="loot__recurring-unit">{t("perMonth")}</span>
             </span>
           ) : null}
           {reason ? <span className="t-body-s tone-2">{nonBreaking(reason)}</span> : null}

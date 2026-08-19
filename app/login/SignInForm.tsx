@@ -4,6 +4,7 @@ import { useState, useActionState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import {
   Button,
@@ -21,6 +22,8 @@ import { INITIAL_SIGNIN_STATE } from "./state";
 import styles from "@/components/gate/gate.module.css";
 
 export function SignIn() {
+  const t = useTranslations("SignIn");
+  const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
     signInAction,
     INITIAL_SIGNIN_STATE,
@@ -42,13 +45,13 @@ export function SignIn() {
 
       {justReset && !state.error ? (
         <p className={styles.notice} role="status">
-          Password changed. Sign in with the new one.
+          {t("passwordChanged")}
         </p>
       ) : null}
 
       <div className={styles.fields}>
         <Field>
-          <FieldLabel htmlFor="signin-email">Email</FieldLabel>
+          <FieldLabel htmlFor="signin-email">{common("email")}</FieldLabel>
           <Input
             id="signin-email"
             name="email"
@@ -64,7 +67,7 @@ export function SignIn() {
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="signin-password">Password</FieldLabel>
+          <FieldLabel htmlFor="signin-password">{common("password")}</FieldLabel>
           <InputGroup>
             <InputGroupInput
               id="signin-password"
@@ -78,14 +81,14 @@ export function SignIn() {
             <InputGroupButton
               onClick={() => setVisible((was) => !was)}
               aria-pressed={visible}
-              aria-label={visible ? "Hide password" : "Show password"}
+              aria-label={visible ? common("hidePassword") : common("showPassword")}
             >
               {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
             </InputGroupButton>
           </InputGroup>
           <p className={styles.forgot}>
             <Link href="/forgot-password" className={styles.link}>
-              Forgot password?
+              {t("forgotPassword")}
             </Link>
           </p>
         </Field>
@@ -96,7 +99,7 @@ export function SignIn() {
 
       <div style={{ marginTop: "24px" }}>
         <Button type="submit" variant="primary" fullWidth disabled={inProgress}>
-          {inProgress ? "Checking…" : "Enter the field"}
+          {inProgress ? t("checking") : t("submit")}
         </Button>
       </div>
     </form>

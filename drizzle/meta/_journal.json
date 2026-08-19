@@ -43,6 +43,13 @@
       "when": 1786359189181,
       "tag": "0005_wise_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787084701791,
+      "tag": "0006_wet_enchantress",
+      "breakpoints": true
     }
   ]
 }

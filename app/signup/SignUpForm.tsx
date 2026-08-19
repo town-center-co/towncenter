@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Requirements } from "@/components/gate/Requirements";
 import {
@@ -27,6 +28,8 @@ export type SignUpProps = {
 };
 
 export function SignUp({ isFirstAccount }: SignUpProps) {
+  const t = useTranslations("SignUp");
+  const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
     signUpAction,
     INITIAL_SIGNUP_STATE,
@@ -49,15 +52,12 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
       ) : null}
 
       {isFirstAccount ? (
-        <p className={styles.notice}>
-          This instance has no account yet. The one you create now becomes its
-          owner, and everything already surveyed here belongs to it.
-        </p>
+        <p className={styles.notice}>{t("firstAccountNotice")}</p>
       ) : null}
 
       <div className={styles.fields}>
         <Field>
-          <FieldLabel htmlFor="signup-email">Email</FieldLabel>
+          <FieldLabel htmlFor="signup-email">{common("email")}</FieldLabel>
           <Input
             id="signup-email"
             name="email"
@@ -75,7 +75,7 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="signup-name">Name</FieldLabel>
+          <FieldLabel htmlFor="signup-name">{t("name")}</FieldLabel>
           <Input
             id="signup-name"
             name="displayName"
@@ -86,14 +86,12 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
             aria-invalid={state.fields.displayName ? true : undefined}
             aria-describedby={`signup-name-hint${state.fields.displayName ? " signup-name-error" : ""}`}
           />
-          <FieldDescription id="signup-name-hint">
-            Optional. It only shows in the account menu.
-          </FieldDescription>
+          <FieldDescription id="signup-name-hint">{t("nameHint")}</FieldDescription>
           <FieldError id="signup-name-error">{state.fields.displayName}</FieldError>
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="signup-password">Password</FieldLabel>
+          <FieldLabel htmlFor="signup-password">{common("password")}</FieldLabel>
           <InputGroup>
             <InputGroupInput
               id="signup-password"
@@ -109,7 +107,7 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
             <InputGroupButton
               onClick={() => setVisible((was) => !was)}
               aria-pressed={visible}
-              aria-label={visible ? "Hide password" : "Show password"}
+              aria-label={visible ? common("hidePassword") : common("showPassword")}
             >
               {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
             </InputGroupButton>
@@ -122,7 +120,7 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
 
       <div style={{ marginTop: "24px" }}>
         <Button type="submit" variant="primary" fullWidth disabled={inProgress}>
-          {inProgress ? "Creating…" : isFirstAccount ? "Claim this instance" : "Create account"}
+          {inProgress ? t("creating") : isFirstAccount ? t("claim") : t("create")}
         </Button>
       </div>
     </form>

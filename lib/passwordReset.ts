@@ -15,7 +15,7 @@ import { normalizeEmail } from "@/lib/accounts";
 import { db, passwordResetTokens, users } from "@/lib/db";
 import { appUrl, sendEmail } from "@/lib/email/resend";
 import { passwordResetEmail } from "@/lib/email/templates";
-import { checkPasswordShape, hashPassword } from "@/lib/password";
+import { checkPasswordShape, hashPassword, type PasswordRefusal } from "@/lib/password";
 
 export const RESET_TOKEN_TTL_MINUTES = 30;
 
@@ -116,7 +116,11 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
   );
 }
 
-export type ResetOutcome = { ok: true } | { ok: false; message: string };
+export type ResetOutcome =
+  | { ok: true }
+  // `key` looks up the translated text at the UI boundary; `message` is the
+  // English fallback for non-request contexts (scripts, tests).
+  | { ok: false; key: "invalidLink" | PasswordRefusal["key"]; message: string };
 
 // One generic refusal for missing, forged and expired tokens alike: telling
 // them apart tells a prober which hashes exist.
@@ -128,7 +132,7 @@ export async function resetPassword(
   newPassword: string,
 ): Promise<ResetOutcome> {
   const token = rawToken.trim();
-  if (token === "") return { ok: false, message: INVALID_LINK };
+  if (token === "") return { ok: false, key: "invalidLink", message: INVALID_LINK };
 
   const [row] = await db
     .select({
@@ -142,12 +146,12 @@ export async function resetPassword(
     .limit(1);
 
   if (!row || row.expiresAt.getTime() <= Date.now()) {
-    return { ok: false, message: INVALID_LINK };
+    return { ok: false, key: "invalidLink", message: INVALID_LINK };
   }
 
   // the same rules as signup, and THESE are authoritative
   const refusal = checkPasswordShape(newPassword, normalizeEmail(row.email));
-  if (refusal) return { ok: false, message: refusal.message };
+  if (refusal) return { ok: false, key: refusal.key, message: refusal.message };
 
   // ~130 ms of scrypt: outside the transaction, same rule as createAccount.
   const passwordHash = await hashPassword(newPassword);
@@ -184,5 +188,7 @@ export async function resetPassword(
     return true;
   });
 
-  return applied ? { ok: true } : { ok: false, message: INVALID_LINK };
+  return applied
+    ? { ok: true }
+    : { ok: false, key: "invalidLink", message: INVALID_LINK };
 }

@@ -17,6 +17,7 @@
 import "server-only";
 
 import { and, desc, eq, gte, inArray, lte, ne, sql, type SQL } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 
 import type { Account } from "@/lib/accounts";
 import { getCumulativeAreaKm2 as readCumulativeAreaKm2 } from "@/lib/billing/area";
@@ -214,9 +215,12 @@ export type JournalEntry = {
   occurredAt: string;
 };
 
+export type FrontAction = "followUp" | "call" | "walkPast" | "priceIt";
+
 export type FrontLine = {
   target: TargetRow;
-  action: string;
+  /** ASCII key: `DailyFront.action.*` in the translated verb display, never shown as-is. */
+  action: FrontAction;
   reason: string;
   daysSinceLastEvent: number | null;
   overdue: boolean;
@@ -247,6 +251,8 @@ export type ZoneRow = {
 function toIso(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
+
+type PriceReasonsT = Awaited<ReturnType<typeof getTranslations<"PriceReasons">>>;
 
 // The owner clause lives in the same function as the frame on purpose: a caller
 // that forgot it would not show an empty page, it would show someone else's
@@ -359,6 +365,7 @@ function toTargetRow(
   outcomeCount: number,
   now: string,
   grid: PriceGrid,
+  t: PriceReasonsT,
 ): TargetRow {
   const hasGoogle = record.googleFetchedAt !== null;
   const googleStale = hasGoogle && isGoogleDataStale(record.googleFetchedAt);
@@ -419,9 +426,18 @@ function toTargetRow(
     harvestedAt: record.harvestedAt.toISOString(),
     proximity,
     score,
-    lootReason: lootReason(score, record.establishmentCount),
+    lootReason: translateLootReason(score, record.establishmentCount, t),
     resistancePercent: 100 - score.success.percent,
   };
+}
+
+function translateLootReason(
+  score: PlaceScore,
+  establishmentCount: number | null,
+  t: PriceReasonsT,
+): string {
+  const reason = lootReason(score, establishmentCount);
+  return t(reason.key as Parameters<typeof t>[0], reason.params);
 }
 
 // Takes and withdrawals, nothing else. Below CALIBRATION_MIN_OUTCOMES the
@@ -620,7 +636,7 @@ export async function listTargetsInBbox(
   );
   const where = and(bboxCondition(owner.id, bbox), ...filterConditions(filters)) as SQL;
 
-  const [records, tallyRows, anchors, outcomeCount, grid] =
+  const [records, tallyRows, anchors, outcomeCount, grid, t] =
     await Promise.all([
     db
       .select()
@@ -633,11 +649,12 @@ export async function listTargetsInBbox(
     loadProximityAnchors(owner.id),
     getOutcomeCount(owner),
     getPriceGrid(owner),
+    getTranslations("PriceReasons"),
   ]);
 
   const now = new Date().toISOString();
   const rows = records.map((record) =>
-    toTargetRow(record, anchors, outcomeCount, now, grid),
+    toTargetRow(record, anchors, outcomeCount, now, grid, t),
   );
   const ranked = sortRows(rows, filters);
   const kept = ranked.slice(0, limit);
@@ -664,14 +681,15 @@ export async function getTargetRow(owner: Account, id: string): Promise<TargetRo
     .limit(1);
   if (!record) return null;
 
-  const [anchors, outcomeCount, grid] =
+  const [anchors, outcomeCount, grid, t] =
     await Promise.all([
     loadProximityAnchors(owner.id),
     getOutcomeCount(owner),
     getPriceGrid(owner),
+    getTranslations("PriceReasons"),
   ]);
 
-  return toTargetRow(record, anchors, outcomeCount, new Date().toISOString(), grid);
+  return toTargetRow(record, anchors, outcomeCount, new Date().toISOString(), grid, t);
 }
 
 // Neighbours are sorted by distance IN SQL, before the ceiling: taking eight
@@ -687,15 +705,16 @@ export async function getTargetDetail(owner: Account, id: string): Promise<Targe
     .limit(1);
   if (!record) return null;
 
-  const [anchors, outcomeCount, grid] =
+  const [anchors, outcomeCount, grid, t] =
     await Promise.all([
     loadProximityAnchors(owner.id),
     getOutcomeCount(owner),
     getPriceGrid(owner),
+    getTranslations("PriceReasons"),
   ]);
 
   const now = new Date().toISOString();
-  const target = toTargetRow(record, anchors, outcomeCount, now, grid);
+  const target = toTargetRow(record, anchors, outcomeCount, now, grid, t);
 
   const latSpan = CLUSTER_RADIUS_METERS / (111_195 * 1);
   const cosLat = Math.cos((record.lat * Math.PI) / 180);
@@ -733,7 +752,7 @@ export async function getTargetDetail(owner: Account, id: string): Promise<Targe
 
   const neighbourRows = neighbourRecords.map((row) => ({
     record: row,
-    row: toTargetRow(row, anchors, outcomeCount, now, grid),
+    row: toTargetRow(row, anchors, outcomeCount, now, grid, t),
   }));
 
   const neighbours: TargetNeighbour[] = neighbourRows
@@ -768,7 +787,7 @@ function emptyStateCounts(): Record<TargetState, number> {
 export async function getZoneStats(owner: Account, bbox: Bbox): Promise<ZoneStats> {
   const where = bboxCondition(owner.id, bbox);
 
-  const [records, anchors, outcomeCount, takenRows, grid] =
+  const [records, anchors, outcomeCount, takenRows, grid, t] =
     await Promise.all([
     db
       .select()
@@ -784,6 +803,7 @@ export async function getZoneStats(owner: Account, bbox: Bbox): Promise<ZoneStat
       .innerJoin(targets, eq(targets.id, events.targetId))
       .where(and(eq(events.ownerId, owner.id), eq(events.kind, "take"), where)),
     getPriceGrid(owner),
+    getTranslations("PriceReasons"),
   ]);
 
   const truncated = records.length > MAX_TARGETS_FOR_STATS;
@@ -798,7 +818,7 @@ export async function getZoneStats(owner: Account, bbox: Bbox): Promise<ZoneStat
   let total = 0;
 
   for (const record of records.slice(0, MAX_TARGETS_FOR_STATS)) {
-    const row = toTargetRow(record, anchors, outcomeCount, now, grid);
+    const row = toTargetRow(record, anchors, outcomeCount, now, grid, t);
     total += 1;
     countByState[row.state] += 1;
 
@@ -945,7 +965,8 @@ export async function listJournal(
 const FOLLOWUP_AFTER_DAYS = 3;
 
 export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]> {
-  const [records, anchors, outcomeCount, lastEvents, grid] =
+  const t = await getTranslations("DailyFront");
+  const [records, anchors, outcomeCount, lastEvents, grid, tPriceReason] =
     await Promise.all([
     db
       .select()
@@ -968,6 +989,7 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
       .where(eq(events.ownerId, owner.id))
       .groupBy(events.targetId),
     getPriceGrid(owner),
+    getTranslations("PriceReasons"),
   ]);
 
   // max() over a timestamp column comes back as raw SECONDS: drizzle only
@@ -982,7 +1004,7 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
   const now = nowDate.toISOString();
 
   const lines = records.map((record) => {
-    const target = toTargetRow(record, anchors, outcomeCount, now, grid);
+    const target = toTargetRow(record, anchors, outcomeCount, now, grid, tPriceReason);
     const lastAt = lastByTarget.get(record.id) ?? null;
     const daysSinceLastEvent =
       lastAt === null
@@ -1000,11 +1022,11 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
       const overdue = late >= FOLLOWUP_AFTER_DAYS;
       return {
         ...line,
-        action: "Follow up",
+        action: "followUp" as FrontAction,
         reason:
           daysSinceLastEvent === null
-            ? "engaged, no trace of contact"
-            : `follow-up due for ${late} d`,
+            ? t("reasonEngagedNoContact")
+            : t("reasonFollowUpDue", { days: late }),
         priority: overdue ? 0 : 1,
         overdue,
       };
@@ -1013,8 +1035,11 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
     if (target.state === "studied") {
       return {
         ...line,
-        action: "Call",
-        reason: `resistance ${target.resistancePercent} % · ${target.lootReason}`,
+        action: "call" as FrontAction,
+        reason: t("reasonResistance", {
+          pct: target.resistancePercent,
+          lootReason: target.lootReason,
+        }),
         priority: 2,
         overdue: false,
       };
@@ -1022,7 +1047,7 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
 
     return {
       ...line,
-      action: "Walk past",
+      action: "walkPast" as FrontAction,
       reason: target.lootReason,
       priority: 3,
       overdue: false,
@@ -1058,8 +1083,8 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
         ...bestOffGrid,
         // the verb follows the seat: an off-grid target is not called, it is
         // PRICED: a visit and a hand-written quote
-        action: "Price it",
-        reason: `${bestOffGrid.reason} · seat reserved for off-grid`,
+        action: "priceIt" as FrontAction,
+        reason: t("reasonSeatReservedForOffGrid", { reason: bestOffGrid.reason }),
       };
     }
   }

@@ -8,6 +8,8 @@
 // reconstitutes them); and the resistance always ships with its calibration
 // state, so a reader does not take an uncalibrated figure for a measurement.
 
+import { createTranslator } from "next-intl";
+
 import type { TargetDetail } from "@/app/queries";
 import { SOURCE_ORDER, SOURCES } from "@/components/ui";
 import { formatEuros, formatRatingTenths } from "@/lib/format";
@@ -17,14 +19,55 @@ import { CALIBRATION_MIN_OUTCOMES } from "@/lib/types";
 import { chosenSite, chosenPhone } from "./fields";
 import { fiveFacts } from "./facts";
 import {
-  STATE_LABEL,
-  EVENT_LABEL,
-  PROXIMITY_LABEL,
   distance,
   dateFromDay,
   longDate,
   formatNumber,
 } from "./text";
+import type { EventKind, TargetState } from "@/lib/types";
+
+import enMessages from "../../messages/en.json";
+
+// This export leaves the product for an agent to read, so it stays in a
+// single fixed language regardless of the UI locale — deliberately NOT
+// wired to next-intl for its OWN strings below (see `text.ts` for the
+// UI-facing, locale-aware versions of these same labels). It still calls into
+// `fiveFacts`, which IS wired to next-intl for the UI's sake, so this builds
+// a translator locked to English rather than letting the request's locale
+// leak into an export that must read the same everywhere.
+// Cast rather than relying on generic inference to line up with `facts.ts`'s
+// own `T` (derived from `useTranslations`, not `createTranslator`): both are
+// the same next-intl translator shape at runtime, but inferred through two
+// different generic paths that don't unify structurally.
+const factsTranslator = createTranslator({
+  locale: "en",
+  messages: enMessages,
+  namespace: "Facts",
+}) as Parameters<typeof fiveFacts>[2];
+const STATE_LABEL: Record<TargetState, string> = {
+  spotted: "Spotted",
+  studied: "Studied",
+  engaged: "Engaged",
+  taken: "Taken",
+  withdrawn: "Withdrawn",
+  dismissed: "Set aside",
+};
+
+const EVENT_LABEL: Record<EventKind, string> = {
+  survey: "Spotted",
+  study: "Study",
+  contact: "Call",
+  reply: "Reply",
+  take: "Taken",
+  withdrawal: "Withdrawn",
+};
+
+const PROXIMITY_LABEL: Record<string, string> = {
+  "same-street-capture": "Same street as a deal we took",
+  "near-live-deal": "Within 300 m of a live deal",
+  "in-zone": "No reference nearby",
+  "outside-zone": "Outside the worked sectors",
+};
 
 /**
  * A Markdown table cell, escaped.
@@ -91,7 +134,7 @@ export function sheetAsMarkdown(
   const success = target.score.success;
   const offGrid = price.kind === "off-grid";
   const calibrated = outcomeCount >= CALIBRATION_MIN_OUTCOMES;
-  const facts = fiveFacts(target, now);
+  const facts = fiveFacts(target, now, factsTranslator);
 
   const rows: string[] = [];
 

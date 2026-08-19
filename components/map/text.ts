@@ -2,8 +2,14 @@
 // without an explicit timeZone reads the machine's, so the server and the
 // browser render two different strings and every date mismatches on hydration.
 
+import type { useTranslations } from "next-intl";
+
 import { LOCALE, TIME_ZONE } from "@/lib/format";
 import type { EventKind, TargetState } from "@/lib/types";
+
+// Structurally compatible with both `useTranslations` (client) and
+// `getTranslations` (server) — these label builders are called from both.
+type T = ReturnType<typeof useTranslations<"TargetLabels">>;
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
@@ -49,46 +55,60 @@ export function yearsSince(
 }
 
 // the keys are stored in the database and drive `data-*` attributes; only the
-// labels are visible text.
+// labels are visible text. Built per call, not at module scope: the labels
+// come from the request's locale, which is only available once a translator
+// has been resolved (`useTranslations("TargetLabels")` or
+// `getTranslations("TargetLabels")`).
 
-export const STATE_LABEL: Record<TargetState, string> = {
-  spotted: "Spotted",
-  studied: "Studied",
-  engaged: "Engaged",
-  taken: "Taken",
-  withdrawn: "Withdrawn",
-  dismissed: "Set aside",
-};
-
-export const APPROACH: readonly { state: TargetState; label: string }[] = [
-  { state: "spotted", label: "Spotted" },
-  { state: "studied", label: "Studied" },
-  { state: "engaged", label: "Engaged" },
-  { state: "taken", label: "Taken" },
-];
-
-export const EVENT_LABEL: Record<EventKind, string> = {
-  survey: "Spotted",
-  study: "Study",
-  contact: "Call",
-  reply: "Reply",
-  take: "Taken",
-  withdrawal: "Withdrawn",
-};
-
-export const ADVANCE_VERB: Record<"studied" | "engaged" | "taken" | "withdrawn", string> =
-  {
-    studied: "Mark as studied",
-    engaged: "Mark as engaged",
-    taken: "Take it",
-    withdrawn: "Withdraw",
+export function stateLabel(t: T): Record<TargetState, string> {
+  return {
+    spotted: t("stateSpotted"),
+    studied: t("stateStudied"),
+    engaged: t("stateEngaged"),
+    taken: t("stateTaken"),
+    withdrawn: t("stateWithdrawn"),
+    dismissed: t("stateDismissed"),
   };
+}
 
-export const STEP_VERB: Record<"studied" | "engaged" | "taken", string> = {
-  studied: "Study",
-  engaged: "Call",
-  taken: "Sign",
-};
+export function approach(t: T): readonly { state: TargetState; label: string }[] {
+  return [
+    { state: "spotted", label: t("stateSpotted") },
+    { state: "studied", label: t("stateStudied") },
+    { state: "engaged", label: t("stateEngaged") },
+    { state: "taken", label: t("stateTaken") },
+  ];
+}
+
+export function eventLabel(t: T): Record<EventKind, string> {
+  return {
+    survey: t("eventSurvey"),
+    study: t("eventStudy"),
+    contact: t("eventContact"),
+    reply: t("eventReply"),
+    take: t("eventTake"),
+    withdrawal: t("eventWithdrawal"),
+  };
+}
+
+export function advanceVerb(
+  t: T,
+): Record<"studied" | "engaged" | "taken" | "withdrawn", string> {
+  return {
+    studied: t("advanceStudied"),
+    engaged: t("advanceEngaged"),
+    taken: t("advanceTaken"),
+    withdrawn: t("advanceWithdrawn"),
+  };
+}
+
+export function stepVerb(t: T): Record<"studied" | "engaged" | "taken", string> {
+  return {
+    studied: t("stepStudied"),
+    engaged: t("stepEngaged"),
+    taken: t("stepTaken"),
+  };
+}
 
 // dates a step from the log; inverse of STATE_FOR_EVENT on the server side,
 // and the two must stay consistent.
@@ -101,12 +121,14 @@ export const STEP_EVENT: Record<TargetState, EventKind | null> = {
   dismissed: null,
 };
 
-export const PROXIMITY_LABEL: Record<string, string> = {
-  "same-street-capture": "Same street as a deal we took",
-  "near-live-deal": "Within 300 m of a live deal",
-  "in-zone": "No reference nearby",
-  "outside-zone": "Outside the worked sectors",
-};
+export function proximityLabel(t: T): Record<string, string> {
+  return {
+    "same-street-capture": t("proximitySameStreetCapture"),
+    "near-live-deal": t("proximityNearLiveDeal"),
+    "in-zone": t("proximityInZone"),
+    "outside-zone": t("proximityOutsideZone"),
+  };
+}
 
 export function plural(n: number, singular: string, pluralForm: string): string {
   return `${n} ${n > 1 ? pluralForm : singular}`;

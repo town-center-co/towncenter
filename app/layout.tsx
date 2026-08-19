@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Source_Serif_4 } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import Script from "next/script";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -83,15 +85,17 @@ export const viewport: Viewport = {
   themeColor: "#edeff2",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+
   return (
     // `data-theme` is an ASCII key: `dark` / `light`. Light is the default.
     <html
-      lang="en"
+      lang={locale}
       data-theme={DEFAULT_THEME}
       className={`${mono.variable} ${serif.variable}`}
       // The script below fixes `data-theme` before paint, so the server-rendered
@@ -119,8 +123,10 @@ export default function RootLayout({
           <i className="rigging__l1" />
           <i className="rigging__l2" />
         </div>
-        {children}
-        <Toaster position="bottom-right" />
+        <NextIntlClientProvider>
+          {children}
+          <Toaster position="bottom-right" />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

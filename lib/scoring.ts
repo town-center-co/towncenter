@@ -9,6 +9,7 @@
 import { formatEuros, formatPercent } from "@/lib/format";
 
 import type {
+  LootReason,
   PlaceScore,
   PriceAdjustment,
   PriceEstimate,
@@ -168,6 +169,8 @@ export function estimatePrice(
     return outOfGrid(
       "by-quote",
       `${knownAddresses} open establishments: the scope can only be quoted after seeing it, and the decision is not taken at the counter.`,
+      "reasonTooManyAddresses",
+      { count: knownAddresses },
     );
   }
 
@@ -175,24 +178,33 @@ export function estimatePrice(
     return outOfGrid(
       "to-qualify",
       "Online sales detected: this is no longer a storefront but a shop — different work, different price. To qualify by voice.",
+      "reasonOnlineSales",
     );
   }
 
   let offer: PriceOffer;
   let base: number;
   let reason: string;
+  let reasonKey: string;
+  let reasonParams: Record<string, string | number> | undefined;
 
   if (addresses >= 2) {
     offer = "multi-address";
     base = grid.multiAddressCents;
     reason = `${addresses} addresses to cover: one page per location and a structure that holds up.`;
+    reasonKey = "reasonMultiAddress";
+    reasonParams = { count: addresses };
   } else if (isComplexSite(site, grid)) {
     offer = "multi-page";
     base = grid.multiPageCents;
-    reason =
-      site?.onlineBooking === true
-        ? "Online booking to rebuild: this is no longer a storefront, it is a journey."
-        : `At least ${grid.complexSiteMinPages} pages: design weighs more than integration.`;
+    if (site?.onlineBooking === true) {
+      reason = "Online booking to rebuild: this is no longer a storefront, it is a journey.";
+      reasonKey = "reasonOnlineBooking";
+    } else {
+      reason = `At least ${grid.complexSiteMinPages} pages: design weighs more than integration.`;
+      reasonKey = "reasonManyPages";
+      reasonParams = { minPages: grid.complexSiteMinPages };
+    }
   } else if (
     facts.reviewCount !== null &&
     facts.reviewCount < grid.fewReviewsForBase &&
@@ -202,10 +214,12 @@ export function estimatePrice(
     base = grid.baseCents;
     reason =
       "One address, few reviews, no usable photo: the base tier is enough, and that is what makes it sellable.";
+    reasonKey = "reasonBaseTier";
   } else {
     offer = "full-site";
     base = grid.fullSiteCents;
     reason = "One address, a complete site: the offer that sells most often.";
+    reasonKey = "reasonFullSite";
   }
 
   const adjustments: PriceAdjustment[] = [];
@@ -217,6 +231,8 @@ export function estimatePrice(
     );
     adjustments.push({
       label: `${addresses - 2} extra address${addresses - 2 > 1 ? "es" : ""}`,
+      key: "extraAddresses",
+      params: { count: addresses - 2 },
       amountCents: amount,
     });
   }
@@ -224,6 +240,7 @@ export function estimatePrice(
   if (site?.onlineBooking === true && offer !== "multi-page") {
     adjustments.push({
       label: "Booking to integrate",
+      key: "bookingIntegration",
       amountCents: grid.bookingIntegrationCents,
     });
   }
@@ -231,6 +248,7 @@ export function estimatePrice(
   if (site?.usablePhotos === false && offer !== "base") {
     adjustments.push({
       label: "No usable photo",
+      key: "noUsablePhoto",
       amountCents: grid.noPhotoCents,
     });
   }
@@ -255,11 +273,18 @@ export function estimatePrice(
     recurringCents,
     value12MonthsCents: priceCents + grid.valueHorizonMonths * recurringCents,
     reason,
+    reasonKey,
+    reasonParams,
     adjustments,
   };
 }
 
-function outOfGrid(offer: PriceOffer, reason: string): PriceEstimate {
+function outOfGrid(
+  offer: PriceOffer,
+  reason: string,
+  reasonKey: string,
+  reasonParams?: Record<string, string | number>,
+): PriceEstimate {
   return {
     kind: "off-grid",
     offer,
@@ -267,6 +292,8 @@ function outOfGrid(offer: PriceOffer, reason: string): PriceEstimate {
     recurringCents: 0,
     value12MonthsCents: 0,
     reason,
+    reasonKey,
+    reasonParams,
     adjustments: [],
   };
 }
@@ -275,22 +302,38 @@ function outOfGrid(offer: PriceOffer, reason: string): PriceEstimate {
 // audit never ran, which is not the same fact as "no website".
 function reasonFactor(site: SiteAuditFacts | null, reference: Date): SuccessFactor {
   if (!site) {
-    return { label: "Reason: site never audited", value: 1 };
+    return { label: "Reason: site never audited", key: "reasonNeverAudited", value: 1 };
   }
   if (site.agencyDetected === true) {
-    return { label: "Reason: agency already in place", value: REASON_SITE_PRO };
+    return {
+      label: "Reason: agency already in place",
+      key: "reasonAgencyInPlace",
+      value: REASON_SITE_PRO,
+    };
   }
   if (site.instagramAsSite === true) {
-    return { label: "Reason: Instagram used as a website", value: REASON_INSTAGRAM };
+    return {
+      label: "Reason: Instagram used as a website",
+      key: "reasonInstagram",
+      value: REASON_INSTAGRAM,
+    };
   }
   if (site.issue === "no_known_site") {
-    return { label: "Reason: no known website", value: REASON_NO_SITE };
+    return { label: "Reason: no known website", key: "reasonNoSite", value: REASON_NO_SITE };
   }
   if (site.issue === "site_unreachable") {
-    return { label: "Reason: site unreachable, inconclusive", value: 1 };
+    return {
+      label: "Reason: site unreachable, inconclusive",
+      key: "reasonSiteUnreachable",
+      value: 1,
+    };
   }
   if (site.defaultTheme === true) {
-    return { label: "Reason: default theme never touched", value: REASON_SITE_DATED };
+    return {
+      label: "Reason: default theme never touched",
+      key: "reasonDefaultTheme",
+      value: REASON_SITE_DATED,
+    };
   }
 
   const modified = site.lastModified
@@ -300,16 +343,20 @@ function reasonFactor(site: SiteAuditFacts | null, reference: Date): SuccessFact
   const staleMonths = modifiedKnown ? monthsBetween(modified, reference) : null;
 
   if (staleMonths !== null && staleMonths >= SITE_STALE_MONTHS) {
-    return { label: "Reason: visibly dated site", value: REASON_SITE_DATED };
+    return { label: "Reason: visibly dated site", key: "reasonDatedSite", value: REASON_SITE_DATED };
   }
 
   // a missing snapshot is an absence of signal, never proof of upkeep.
   const upkeepProven = staleMonths !== null && staleMonths < SITE_STALE_MONTHS;
   if (qualityMarkCount(site) >= SITE_PRO_MIN_MARKS && upkeepProven) {
-    return { label: "Reason: professional site, maintained", value: REASON_SITE_PRO };
+    return {
+      label: "Reason: professional site, maintained",
+      key: "reasonProSite",
+      value: REASON_SITE_PRO,
+    };
   }
 
-  return { label: "Reason: site is fine", value: REASON_SITE_DECENT };
+  return { label: "Reason: site is fine", key: "reasonSiteFine", value: REASON_SITE_DECENT };
 }
 
 // three fallbacks in order: recent revenue, employee band, footfall from
@@ -326,34 +373,68 @@ function capacityFactor(facts: ScoringFacts, reference: Date): SuccessFactor {
     const revenue = facts.revenueCents;
     const year = facts.financesYear ? ` (${facts.financesYear})` : "";
     if (revenue >= REVENUE_COMFORTABLE_CENTS) {
-      return { label: `Capacity: comfortable revenue${year}`, value: CAPACITY_STRONG };
+      return {
+        label: `Capacity: comfortable revenue${year}`,
+        key: "capacityRevenue",
+        params: { level: "comfortable", year },
+        value: CAPACITY_STRONG,
+      };
     }
     if (revenue >= REVENUE_GOOD_CENTS) {
-      return { label: `Capacity: solid revenue${year}`, value: CAPACITY_GOOD };
+      return {
+        label: `Capacity: solid revenue${year}`,
+        key: "capacityRevenue",
+        params: { level: "solid", year },
+        value: CAPACITY_GOOD,
+      };
     }
     if (revenue >= REVENUE_LOW_CENTS) {
-      return { label: `Capacity: average revenue${year}`, value: CAPACITY_AVERAGE };
+      return {
+        label: `Capacity: average revenue${year}`,
+        key: "capacityRevenue",
+        params: { level: "average", year },
+        value: CAPACITY_AVERAGE,
+      };
     }
-    return { label: `Capacity: low revenue${year}`, value: CAPACITY_LOW };
+    return {
+      label: `Capacity: low revenue${year}`,
+      key: "capacityRevenue",
+      params: { level: "low", year },
+      value: CAPACITY_LOW,
+    };
   }
 
   const headcount = employeeFloor(facts.employeeRange);
   if (headcount !== null) {
     if (headcount >= HEADCOUNT_HIGH) {
-      return { label: `Capacity: ${headcount} employees or more`, value: CAPACITY_STRONG };
+      return {
+        label: `Capacity: ${headcount} employees or more`,
+        key: "capacityEmployeesOrMore",
+        params: { headcount },
+        value: CAPACITY_STRONG,
+      };
     }
     if (headcount >= HEADCOUNT_GOOD) {
-      return { label: `Capacity: ${headcount} employees or more`, value: CAPACITY_GOOD };
+      return {
+        label: `Capacity: ${headcount} employees or more`,
+        key: "capacityEmployeesOrMore",
+        params: { headcount },
+        value: CAPACITY_GOOD,
+      };
     }
     if (headcount >= 1) {
-      return { label: "Capacity: one or two employees", value: CAPACITY_AVERAGE };
+      return {
+        label: "Capacity: one or two employees",
+        key: "capacityOneOrTwoEmployees",
+        value: CAPACITY_AVERAGE,
+      };
     }
-    return { label: "Capacity: no employees", value: CAPACITY_WEAK };
+    return { label: "Capacity: no employees", key: "capacityNoEmployees", value: CAPACITY_WEAK };
   }
 
   const reviews = facts.reviewCount;
   if (reviews === null || reviews <= 0) {
-    return { label: "Capacity: unknown", value: 1 };
+    return { label: "Capacity: unknown", key: "capacityUnknown", value: 1 };
   }
 
   // footfall is a RATE; without a known age the raw total stands in for it.
@@ -363,42 +444,50 @@ function capacityFactor(facts: ScoringFacts, reference: Date): SuccessFactor {
 
   let value: number;
   let label: string;
+  let level: "heavy" | "good" | "moderate" | "light";
   if (perYear >= REVIEWS_PER_YEAR_HIGH) {
     value = CAPACITY_STRONG;
     label = "Capacity: heavy footfall";
+    level = "heavy";
   } else if (perYear >= REVIEWS_PER_YEAR_GOOD) {
     value = CAPACITY_GOOD;
     label = "Capacity: good footfall";
+    level = "good";
   } else if (perYear >= REVIEWS_PER_YEAR_AVERAGE) {
     value = CAPACITY_AVERAGE;
     label = "Capacity: moderate footfall";
+    level = "moderate";
   } else {
     value = CAPACITY_WEAK;
     label = "Capacity: light footfall";
+    level = "light";
   }
 
+  let ticket: "none" | "high" | "small" = "none";
   if (facts.priceLevel !== null && facts.priceLevel >= 3 && value < CAPACITY_STRONG) {
     value = value === CAPACITY_GOOD ? CAPACITY_STRONG : CAPACITY_GOOD;
     label = `${label}, high ticket`;
+    ticket = "high";
   } else if (facts.priceLevel === 1 && value > CAPACITY_WEAK) {
     value = value === CAPACITY_STRONG ? CAPACITY_GOOD : CAPACITY_WEAK;
     label = `${label}, small ticket`;
+    ticket = "small";
   }
 
-  return { label, value };
+  return { label, key: "capacityFootfall", params: { level, ticket }, value };
 }
 
 function reachabilityFactor(facts: ScoringFacts): SuccessFactor {
   if (facts.directorCount > 0) {
-    return { label: "Reachability: director named", value: REACH_DIRECTOR };
+    return { label: "Reachability: director named", key: "reachabilityDirector", value: REACH_DIRECTOR };
   }
   if (facts.hasPhone) {
-    return { label: "Reachability: direct phone line", value: REACH_PHONE };
+    return { label: "Reachability: direct phone line", key: "reachabilityPhone", value: REACH_PHONE };
   }
   if (facts.hasContactForm) {
-    return { label: "Reachability: contact form only", value: REACH_FORM };
+    return { label: "Reachability: contact form only", key: "reachabilityForm", value: REACH_FORM };
   }
-  return { label: "Reachability: no contact at all", value: REACH_NONE };
+  return { label: "Reachability: no contact at all", key: "reachabilityNone", value: REACH_NONE };
 }
 
 function proximityFactor(facts: ScoringFacts): SuccessFactor {
@@ -408,21 +497,31 @@ function proximityFactor(facts: ScoringFacts): SuccessFactor {
     "in-zone": "Proximity: inside the sector",
     "outside-zone": "Proximity: outside the sector",
   };
-  return { label: labels[facts.proximity], value: PROXIMITY_FACTORS[facts.proximity] };
+  const keys: Record<ProximityFact, string> = {
+    "same-street-capture": "proximitySameStreet",
+    "near-live-deal": "proximityNearLiveDeal",
+    "in-zone": "proximityInZone",
+    "outside-zone": "proximityOutsideZone",
+  };
+  return {
+    label: labels[facts.proximity],
+    key: keys[facts.proximity],
+    value: PROXIMITY_FACTORS[facts.proximity],
+  };
 }
 
 function ageFactor(facts: ScoringFacts, reference: Date): SuccessFactor {
   const months = ageInMonths(facts.companyCreatedAt, reference);
   if (months === null) {
-    return { label: "Age: unknown", value: 1 };
+    return { label: "Age: unknown", key: "ageUnknown", value: 1 };
   }
   if (months < AGE_YOUNG_MONTHS) {
-    return { label: "Age: under 18 months", value: AGE_YOUNG };
+    return { label: "Age: under 18 months", key: "ageUnder18Months", value: AGE_YOUNG };
   }
   if (months >= AGE_ESTABLISHED_YEARS * 12) {
-    return { label: "Age: over 15 years", value: AGE_ESTABLISHED };
+    return { label: "Age: over 15 years", key: "ageOver15Years", value: AGE_ESTABLISHED };
   }
-  return { label: "Age: established", value: 1 };
+  return { label: "Age: established", key: "ageEstablished", value: 1 };
 }
 
 // a closed establishment and an exercised right to object return a hard zero
@@ -436,14 +535,14 @@ export function estimateSuccess(
   const n = Math.max(0, Math.floor(context.outcomeCount));
   const calibrated = n >= CALIBRATION_MIN_OUTCOMES;
 
-  const factors: SuccessFactor[] = [{ label: "Base rate", value: base }];
+  const factors: SuccessFactor[] = [{ label: "Base rate", key: "baseRate", value: base }];
 
   if (!facts.isOpen) {
-    factors.push({ label: "Disqualifier: establishment closed", value: 0 });
+    factors.push({ label: "Disqualifier: establishment closed", key: "disqualifierClosed", value: 0 });
     return { probability: 0, rawProbability: 0, percent: 0, factors, calibrated, n };
   }
   if (!facts.isDiffusible) {
-    factors.push({ label: "Disqualifier: opt-out right exercised", value: 0 });
+    factors.push({ label: "Disqualifier: opt-out right exercised", key: "disqualifierOptOut", value: 0 });
     return { probability: 0, rawProbability: 0, percent: 0, factors, calibrated, n };
   }
 
@@ -456,6 +555,7 @@ export function estimateSuccess(
   if (facts.isFranchiseGroupSite) {
     factors.push({
       label: "Disqualifier: franchise on a group website",
+      key: "disqualifierFranchise",
       value: FRANCHISE_PENALTY,
     });
   }
@@ -557,19 +657,24 @@ export function explainPlaceScore(score: PlaceScore): string {
 // a one-line reason for the loot figure, short enough for a list row or a map
 // card. An off-grid target is not a zero-euro one: its expectancy is zero by
 // construction, so the establishment count stands in for it instead.
+// Returns a key + params, never English text: this module cannot call
+// next-intl (see ARCHITECTURE.md), so the caller — always in real request
+// context — translates it before it reaches the wire.
 export function lootReason(
   score: PlaceScore,
   establishmentCount: number | null = null,
-): string {
+): LootReason {
   if (score.price.kind === "off-grid") {
-    const fact =
-      establishmentCount !== null && establishmentCount >= 2
-        ? `${establishmentCount} open establishments`
-        : "one address, scope to confirm";
-    return `off-grid · ${fact}`;
+    if (establishmentCount !== null && establishmentCount >= 2) {
+      return { key: "lootReasonOffGridMulti", params: { count: establishmentCount } };
+    }
+    return { key: "lootReasonOffGridSingle", params: {} };
   }
 
   const expectancy = formatEuros(score.expectancyCents, { decimals: "never" });
   const value = formatEuros(score.price.value12MonthsCents, { decimals: "never" });
-  return `expected ${expectancy} · ${score.success.percent} % of ${value}`;
+  return {
+    key: "lootReasonExpected",
+    params: { expectancy, percent: score.success.percent, value },
+  };
 }

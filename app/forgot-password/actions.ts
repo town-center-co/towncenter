@@ -1,27 +1,29 @@
 "use server";
 
 import { after } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
 import { requestPasswordReset } from "@/lib/passwordReset";
 
 import type { ForgotPasswordState } from "./state";
 
-const schema = z.object({
-  email: z.string().min(1, "Enter your email address.").max(320),
-});
-
 export async function forgotPasswordAction(
   _previous: ForgotPasswordState,
   formData: FormData,
 ): Promise<ForgotPasswordState> {
+  const t = await getTranslations("Common");
+  const schema = z.object({
+    email: z.string().min(1, t("enterEmailAddress")).max(320),
+  });
+
   const raw = formData.get("email");
   const email = typeof raw === "string" ? raw.trim() : "";
 
   const parsed = schema.safeParse({ email });
   if (!parsed.success) {
     return {
-      error: parsed.error.issues[0]?.message ?? "Entry refused.",
+      error: parsed.error.issues[0]?.message ?? t("entryRefused"),
       done: false,
       email,
     };

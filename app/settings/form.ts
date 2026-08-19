@@ -1,6 +1,10 @@
+import type { useTranslations } from "next-intl";
+
 import { formatEuros } from "@/lib/format";
 import { PRICE_GRID_SCHEMA } from "@/lib/priceGrid";
 import type { PriceGrid, PriceOffer } from "@/lib/types";
+
+type Translator = ReturnType<typeof useTranslations>;
 
 const CAPPABLE_OFFERS: readonly PriceOffer[] = [
   "base",
@@ -85,7 +89,7 @@ export type GridForm = {
   fields: Record<string, string>;
 };
 
-export function readGridForm(formData: FormData, base: PriceGrid): GridForm {
+export function readGridForm(formData: FormData, base: PriceGrid, t: Translator): GridForm {
   const fields: Record<string, string> = {};
   const raw: Record<string, unknown> = { ...base };
 
@@ -93,24 +97,21 @@ export function readGridForm(formData: FormData, base: PriceGrid): GridForm {
     if (!formData.has(key)) continue;
     const cents = eurosToCents(text(formData, key));
     if (cents === null) {
-      fields[key] = "Enter an amount in euros, e.g. 2000 or 2000.50.";
+      fields[key] = t("enterAmountFormat");
       continue;
     }
 
     const offer = OFFER_BY_FIELD[key];
     if (offer !== undefined && cents < base.floorCents) {
-      fields[key] =
-        `Below the ${formatEuros(base.floorCents)} floor — scoring would never charge this low.`;
+      fields[key] = t("belowFloor", { floor: formatEuros(base.floorCents) });
       continue;
     }
     if (offer !== undefined && base.cappedOffers.includes(offer) && cents > base.ceilingCents) {
-      fields[key] =
-        `Above the ${formatEuros(base.ceilingCents)} ceiling for this offer — scoring would clamp it back down.`;
+      fields[key] = t("aboveCeiling", { ceiling: formatEuros(base.ceilingCents) });
       continue;
     }
     if (key === "recurringBaseCents" && cents > base.recurringCapCents) {
-      fields[key] =
-        `Above the ${formatEuros(base.recurringCapCents)}/month cap — scoring would clamp it back down.`;
+      fields[key] = t("aboveRecurringCap", { cap: formatEuros(base.recurringCapCents) });
       continue;
     }
 
@@ -121,7 +122,7 @@ export function readGridForm(formData: FormData, base: PriceGrid): GridForm {
     if (!formData.has(key)) continue;
     const value = text(formData, key);
     if (!/^\d+$/.test(value)) {
-      fields[key] = "Enter a whole number.";
+      fields[key] = t("enterWholeNumber");
       continue;
     }
     raw[key] = Number(value);
@@ -130,7 +131,7 @@ export function readGridForm(formData: FormData, base: PriceGrid): GridForm {
   if (formData.has("noPhotoCents")) {
     const discountEnteredPositive = eurosToCents(text(formData, "noPhotoCents"));
     if (discountEnteredPositive === null || discountEnteredPositive < 0) {
-      fields.noPhotoCents = "Enter the discount as a positive amount.";
+      fields.noPhotoCents = t("enterPositiveDiscount");
     } else {
       raw.noPhotoCents = -discountEnteredPositive;
     }
@@ -149,9 +150,12 @@ export function readGridForm(formData: FormData, base: PriceGrid): GridForm {
 
   const parsed = PRICE_GRID_SCHEMA.safeParse(raw);
   if (!parsed.success) {
+    // The Zod messages on `PRICE_GRID_SCHEMA` are English internals, never
+    // shown: every field it validates was already checked above, so this is
+    // an unreachable-in-practice fallback and gets one generic translated line.
     for (const issue of parsed.error.issues) {
       const key = String(issue.path[0] ?? "_");
-      if (!(key in fields)) fields[key] = issue.message;
+      if (!(key in fields)) fields[key] = t("invalidValue");
     }
     return { grid: null, fields };
   }

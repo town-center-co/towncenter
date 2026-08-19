@@ -9,6 +9,7 @@
 // runnable twice in a row.
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { and, eq, or, sql } from "drizzle-orm";
 
@@ -92,6 +93,19 @@ function check(title: string, condition: boolean, detail = ""): void {
     failures += 1;
     console.error(`✘ ${title.padEnd(58)} ${detail}`);
   }
+}
+
+// The bench asserts on `messageKey`, never on translated `message` text — but
+// a key match alone would not catch a garbled or emptied-out translation.
+// This reads the actual JSON content directly, independent of which locale
+// the bench session happens to be on, so the wording itself stays covered.
+function messageInLocale(locale: "en" | "fr", key: string): string {
+  const messages = JSON.parse(
+    readFileSync(new URL(`../messages/${locale}.json`, import.meta.url), "utf8"),
+  ) as { ActionMessages: Record<string, string> };
+  const value = messages.ActionMessages[key];
+  if (value === undefined) throw new Error(`No ActionMessages.${key} in ${locale}.json`);
+  return value;
 }
 
 // The test frame, deliberately far OVER the survey area ceiling: a frame small
@@ -547,8 +561,7 @@ async function main() {
   );
   check(
     "an unreadable amount is refused, never NaN",
-    unreadable.status === "error" &&
-      unreadable.message === "Unreadable amount.",
+    unreadable.status === "error" && unreadable.messageKey === "unreadableAmount",
     unreadable.message ?? "",
   );
   check(
@@ -661,8 +674,7 @@ async function main() {
   const emptyUndo = await rollbackTargetAction(IDLE, form({ id: undoTarget }));
   check(
     "undoing an empty ledger is refused, with a reason",
-    emptyUndo.status === "error" &&
-      (emptyUndo.message ?? "").includes("nothing to undo"),
+    emptyUndo.status === "error" && emptyUndo.messageKey === "noFactToUndo",
     emptyUndo.message ?? "",
   );
 
@@ -749,8 +761,7 @@ async function main() {
   );
   check(
     "advancing to the same step twice is refused",
-    twice.status === "error" &&
-      (twice.message ?? "").includes("already at this step"),
+    twice.status === "error" && twice.messageKey === "alreadyAtStep",
     twice.message ?? "",
   );
   check(
@@ -765,8 +776,7 @@ async function main() {
   );
   check(
     "capturing an already-captured business is refused",
-    takenTwice.status === "error" &&
-      (takenTwice.message ?? "").includes("already taken"),
+    takenTwice.status === "error" && takenTwice.messageKey === "alreadyTaken",
     takenTwice.message ?? "",
   );
   check(
@@ -794,8 +804,7 @@ async function main() {
   const setAsideTwice = await dismissTargetAction(IDLE, form({ id: flow }));
   check(
     "setting aside twice is refused",
-    setAsideTwice.status === "error" &&
-      (setAsideTwice.message ?? "").includes("already set aside"),
+    setAsideTwice.status === "error" && setAsideTwice.messageKey === "alreadySetAside",
     setAsideTwice.message ?? "",
   );
 
@@ -828,8 +837,7 @@ async function main() {
   const restoredTwice = await restoreTargetAction(IDLE, form({ id: flow }));
   check(
     "restoring twice is refused",
-    restoredTwice.status === "error" &&
-      (restoredTwice.message ?? "").includes("already in play"),
+    restoredTwice.status === "error" && restoredTwice.messageKey === "alreadyInPlay",
     restoredTwice.message ?? "",
   );
 
@@ -922,7 +930,7 @@ async function main() {
   check(
     "advancing another owner's business is refused",
     stolenAdvance.status === "error" &&
-      stolenAdvance.message === "Business not found." &&
+      stolenAdvance.messageKey === "businessNotFound" &&
       (await ledgerOf(strangerTarget)).length === 0,
     "a guessed id is not enough",
   );
@@ -963,8 +971,7 @@ async function main() {
   );
   check(
     "enriching another owner's business is refused before any key check",
-    stolenEnrich.status === "error" &&
-      stolenEnrich.message === "Business not found.",
+    stolenEnrich.status === "error" && stolenEnrich.messageKey === "businessNotFound",
     stolenEnrich.message ?? "",
   );
 
@@ -991,7 +998,7 @@ async function main() {
   check(
     "a well-formed unknown id is refused cleanly",
     unknown.status === "error" &&
-      unknown.message === "Business not found." &&
+      unknown.messageKey === "businessNotFound" &&
       Object.keys(unknown.fieldErrors).length === 0,
     "it reached the where clause and found nothing",
   );
@@ -1002,8 +1009,7 @@ async function main() {
   );
   check(
     "a non-UUID is stopped by the schema, before the query",
-    notAnId.status === "error" &&
-      notAnId.fieldErrors.id === "Unreadable identifier.",
+    notAnId.status === "error" && notAnId.fieldErrors.id !== undefined,
     notAnId.fieldErrors.id ?? "no field error",
   );
 
@@ -1013,8 +1019,7 @@ async function main() {
   );
   check(
     "…on every action taking an id",
-    notAnIdDismiss.status === "error" &&
-      notAnIdDismiss.fieldErrors.id === "Unreadable identifier.",
+    notAnIdDismiss.status === "error" && notAnIdDismiss.fieldErrors.id !== undefined,
     notAnIdDismiss.fieldErrors.id ?? "no field error",
   );
 
@@ -1057,8 +1062,7 @@ async function main() {
   const brokenFrame = await harvestZoneAction(IDLE, form({ frame: "{" }));
   check(
     "an unreadable sector is refused",
-    brokenFrame.status === "error" &&
-      (brokenFrame.message ?? "").startsWith("Unreadable sector"),
+    brokenFrame.status === "error" && brokenFrame.messageKey === "unreadableSector",
     brokenFrame.message ?? "",
   );
 
@@ -1072,7 +1076,7 @@ async function main() {
     .where(eq(zones.ownerId, actor.id));
   check(
     "a sector over the ceiling is refused, with its own area",
-    tooWide.status === "error" && (tooWide.message ?? "").includes("km²"),
+    tooWide.status === "error" && tooWide.messageKey === "openZoneRefusal:surface",
     tooWide.message ?? "",
   );
   check(
@@ -1095,8 +1099,7 @@ async function main() {
   );
   check(
     "resuming a finished sector is refused",
-    resumeDone.status === "error" &&
-      (resumeDone.message ?? "").includes("finished or missing"),
+    resumeDone.status === "error" && resumeDone.messageKey === "sectorFinishedOrMissing",
     resumeDone.message ?? "",
   );
 
@@ -1107,7 +1110,7 @@ async function main() {
   check(
     "resuming another owner's sector is refused",
     resumeStranger.status === "error" &&
-      (resumeStranger.message ?? "").includes("finished or missing"),
+      resumeStranger.messageKey === "sectorFinishedOrMissing",
     resumeStranger.message ?? "",
   );
 
@@ -1119,14 +1122,15 @@ async function main() {
   );
   check(
     "enriching a frame without a key refuses cleanly",
-    enrichFrame.status === "error" &&
-      (enrichFrame.message ?? "").includes("GOOGLE_PLACES_API_KEY"),
+    enrichFrame.status === "error" && enrichFrame.messageKey === "noGoogleKey",
     "no throw, no half-written record",
   );
   check(
-    "…and the message says what to do about it",
-    (enrichFrame.message ?? "").includes("Set GOOGLE_PLACES_API_KEY"),
-    enrichFrame.message?.slice(0, 46) ?? "",
+    "…and the message says what to do about it, in both locales",
+    messageInLocale("en", "noGoogleKey").includes("GOOGLE_PLACES_API_KEY") &&
+      messageInLocale("en", "noGoogleKey").includes("Set GOOGLE_PLACES_API_KEY") &&
+      messageInLocale("fr", "noGoogleKey").includes("GOOGLE_PLACES_API_KEY"),
+    "no bare env var name with no instruction",
   );
 
   const enrichBadFrame = await enrichZoneAction(
@@ -1135,16 +1139,14 @@ async function main() {
   );
   check(
     "an unreadable frame is refused before the key is even read",
-    enrichBadFrame.status === "error" &&
-      enrichBadFrame.message === "Unreadable frame.",
+    enrichBadFrame.status === "error" && enrichBadFrame.messageKey === "unreadableFrame",
     enrichBadFrame.message ?? "",
   );
 
   const enrichOne = await enrichTargetAction(IDLE, form({ id: noted }));
   check(
     "enriching one business without a key refuses cleanly",
-    enrichOne.status === "error" &&
-      (enrichOne.message ?? "").includes("GOOGLE_PLACES_API_KEY"),
+    enrichOne.status === "error" && enrichOne.messageKey === "noGoogleKey",
     "the record is left untouched",
   );
 

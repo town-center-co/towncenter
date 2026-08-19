@@ -7,9 +7,10 @@
 import "server-only";
 
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 
 import { getCumulativeAreaKm2 } from "@/lib/billing/area";
-import { MESSAGE_EXPIRED, MESSAGE_START_TRIAL } from "@/lib/billing/quotas";
+import { quotaExpiredMessage, quotaStartTrialMessage } from "@/lib/billing/quotas";
 import { getBillingState } from "@/lib/billing/subscriptions";
 import { db, events, targets, zones, type NewTarget, type Zone } from "@/lib/db";
 import { areaKm2, normalizeBbox, pointInPolygon } from "@/lib/geo";
@@ -207,20 +208,21 @@ export type OpenZoneRequest = {
 export async function openZone(
   request: OpenZoneRequest,
 ): Promise<{ zoneId: string; bbox: Bbox; nafCodes: string[] } | ZoneRefusal> {
+  const t = await getTranslations("Harvest");
   const bbox = normalizeBbox(request.bbox);
   const area = areaKm2(bbox);
 
   if (!Number.isFinite(area) || area <= 0) {
     return {
       reason: "surface",
-      message: "Unreadable sector. Draw it again on the map.",
+      message: t("unreadableSector"),
     };
   }
 
   if (area > MAX_ZONE_AREA_KM2) {
     return {
       reason: "surface",
-      message: `Sector too large: ${area.toFixed(1)} km² for ${MAX_ZONE_AREA_KM2} km² at most. Draw a neighbourhood rather than a town.`,
+      message: t("sectorTooLarge", { area: area.toFixed(1), max: MAX_ZONE_AREA_KM2 }),
     };
   }
 
@@ -234,10 +236,10 @@ export async function openZone(
 
   // no mandate yet, or a lapsed one: nothing costly opens, data stays readable.
   if (billing?.state === "none") {
-    return { reason: "billing", message: MESSAGE_START_TRIAL };
+    return { reason: "billing", message: await quotaStartTrialMessage() };
   }
   if (billing?.state === "expired") {
-    return { reason: "billing", message: MESSAGE_EXPIRED };
+    return { reason: "billing", message: await quotaExpiredMessage() };
   }
 
   return db.transaction(async (tx) => {
@@ -256,7 +258,12 @@ export async function openZone(
         const total = cumulative + area;
         return {
           reason: "surface" as const,
-          message: `Cumulative limit reached: ${cumulative.toFixed(1)} km² already surveyed this period. Adding ${area.toFixed(1)} km² would reach ${total.toFixed(1)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²). Manage your plan on the Billing screen.`,
+          message: t("cumulativeLimitReached", {
+            cumulative: cumulative.toFixed(1),
+            area: area.toFixed(1),
+            total: total.toFixed(1),
+            max: MAX_CUMULATIVE_AREA_KM2,
+          }),
         };
       }
     }
@@ -272,7 +279,7 @@ export async function openZone(
       .returning({ id: zones.id });
 
     if (!created) {
-      return { reason: "surface" as const, message: "Sector cannot be opened." };
+      return { reason: "surface" as const, message: t("sectorCannotBeOpened") };
     }
 
     return { zoneId: created.id, bbox, nafCodes };
@@ -319,7 +326,15 @@ export type HarvestSliceRequest = {
 
 /** Serializable: never an `Error`. */
 export type HarvestFailure = {
+  /** Translated, for the immediate toast — never persisted as-is. */
   message: string;
+  /**
+   * Stable id for `zones.error`, which has no locale of its own: a value
+   * read back next week, or by a viewer on a different locale, must not be
+   * frozen to whoever's session wrote it. `null` for a `SireneError`, which
+   * carries its own (English, third-party) text with no key to give it.
+   */
+  messageKey: string | null;
   retryable: boolean;
   /** Everything before it is stored. */
   page: number;
@@ -357,6 +372,7 @@ export type HarvestSlice = {
 export async function harvestSlice(
   request: HarvestSliceRequest,
 ): Promise<HarvestSlice> {
+  const t = await getTranslations("Harvest");
   const bbox = normalizeBbox(request.bbox);
   const circle = circleForBbox(bbox);
   const nafCodes =
@@ -434,9 +450,8 @@ export async function harvestSlice(
       // leave the loop, cancel nothing: `nextPage` points back at this page.
       failure = {
         message:
-          error instanceof SireneError
-            ? error.message
-            : "The company register did not answer.",
+          error instanceof SireneError ? error.message : t("registerDidNotAnswer"),
+        messageKey: error instanceof SireneError ? null : "registerDidNotAnswer",
         retryable: error instanceof SireneError ? error.retryable : true,
         page,
       };
@@ -466,7 +481,8 @@ export async function harvestSlice(
     } catch (error) {
       // a failed write is not retryable: insisting would only burn quota.
       failure = {
-        message: "Could not save.",
+        message: t("couldNotSave"),
+        messageKey: "couldNotSave",
         retryable: false,
         page,
       };
@@ -512,7 +528,12 @@ export async function harvestSlice(
   }
 
   if (failure) {
-    await closeZone(request.zoneId, { status: "failed", error: failure.message });
+    await closeZone(request.zoneId, {
+      status: "failed",
+      // the stable key when there is one, never the translated toast text —
+      // `zones.error` has no locale of its own.
+      error: failure.messageKey ?? failure.message,
+    });
   } else if (done) {
     await closeZone(request.zoneId, { status: "done" });
   }

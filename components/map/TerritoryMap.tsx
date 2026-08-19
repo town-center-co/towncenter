@@ -16,6 +16,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Ellipsis } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type {
   ExpressionSpecification,
   FilterSpecification,
@@ -165,6 +166,7 @@ function targetsToGeoJSON(
   targets: readonly TargetRow[],
   selectedId: string | null,
   standardDeal: number,
+  t: ReturnType<typeof useTranslations>,
 ): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
@@ -188,7 +190,7 @@ function targetsToGeoJSON(
           // MapLibre cannot produce.
           price:
             target.score.price.kind === "off-grid"
-              ? "off-grid"
+              ? t("offGridLabel")
               : formatEuros(target.score.price.value12MonthsCents, { decimals: "never" }),
           // Label placement priority, in cents.
           sort: magnitude,
@@ -203,7 +205,10 @@ function targetsToGeoJSON(
  * drawn — the label carries the count and the spoils, and there is deliberately
  * no halo, which covered a whole block and hid the basemap.
  */
-function clustersToGeoJSON(clusters: readonly TargetCluster[]): GeoJSON.FeatureCollection {
+function clustersToGeoJSON(
+  clusters: readonly TargetCluster[],
+  t: ReturnType<typeof useTranslations>,
+): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
     features: clusters.map((cluster) => ({
@@ -216,7 +221,10 @@ function clustersToGeoJSON(clusters: readonly TargetCluster[]): GeoJSON.FeatureC
       properties: {
         id: cluster.id,
         topTargetId: cluster.topTargetId,
-        label: `${cluster.count} businesses · ${formatEuros(cluster.lootCents, { decimals: "never" })}`,
+        label: t("clusterLabel", {
+          count: cluster.count,
+          amount: formatEuros(cluster.lootCents, { decimals: "never" }),
+        }),
       },
     })),
   };
@@ -757,6 +765,11 @@ export function TerritoryMap({
   defaultNaf,
   fichesParPage,
 }: TerritoryMapProps) {
+  const t = useTranslations("TerritoryMap");
+  // Mirrors `t` for closures inside the map's mount effect, which does not
+  // re-run on a locale switch — same pattern as `updateBadgeRef` below.
+  const tRef = useRef(t);
+  tRef.current = t;
   const router = useRouter();
   const [inTransition, beginTransition] = useTransition();
 
@@ -905,14 +918,21 @@ export function TerritoryMap({
     node.style.transform = `translate(${Math.round(x) + 16}px, ${Math.round(y) + 16}px)`;
     node.dataset.refusal = refused ? "yes" : "no";
     if (tooLarge) {
-      node.textContent = `${formatNumber(area, 2)} km² — beyond ${MAX_ZONE_AREA_KM2} km², the survey is refused`;
+      node.textContent = t("badgeTooLarge", {
+        area: formatNumber(area, 2),
+        max: MAX_ZONE_AREA_KM2,
+      });
     } else if (overCumulative) {
       const total = area + cumulativeAreaKm2.km2;
-      node.textContent = `${formatNumber(area, 2)} km² — total would reach ${formatNumber(total, 2)} km² (${MAX_CUMULATIVE_AREA_KM2} km² limit)`;
+      node.textContent = t("badgeOverCumulative", {
+        area: formatNumber(area, 2),
+        total: formatNumber(total, 2),
+        limit: MAX_CUMULATIVE_AREA_KM2,
+      });
     } else {
-      node.textContent = `${formatNumber(area, 2)} km²`;
+      node.textContent = t("badgeArea", { area: formatNumber(area, 2) });
     }
-  }, [cumulativeAreaKm2]);
+  }, [cumulativeAreaKm2, t]);
 
   const cancelDraw = useCallback(() => {
     traceRef.current = null;
@@ -965,8 +985,8 @@ export function TerritoryMap({
         // list instead of a blank screen.
         setFallback(
           error instanceof Error
-            ? `The map could not open: ${error.message}`
-            : "The map could not open on this machine.",
+            ? tRef.current("mapCouldNotOpenWithReason", { reason: error.message })
+            : tRef.current("mapCouldNotOpen"),
         );
         return;
       }
@@ -1120,7 +1140,7 @@ export function TerritoryMap({
 
         // A three-pixel rectangle is a missed click, not a sector.
         if (area < 0.0005) {
-          setDrawRefusal("Rectangle too small. Drag to draw a sector.");
+          setDrawRefusal(tRef.current("rectangleTooSmall"));
           return;
         }
 
@@ -1128,7 +1148,10 @@ export function TerritoryMap({
         // the API saturates at 10 000 results without saying so.
         if (area > MAX_ZONE_AREA_KM2) {
           setDrawRefusal(
-            `Sector too large: ${formatNumber(area, 2)} km². The limit is ${MAX_ZONE_AREA_KM2} km² per sector. Cut it smaller.`,
+            tRef.current("sectorTooLarge", {
+              area: formatNumber(area, 2),
+              max: MAX_ZONE_AREA_KM2,
+            }),
           );
           return;
         }
@@ -1139,7 +1162,12 @@ export function TerritoryMap({
         ) {
           const total = area + cumulativeAreaKm2.km2;
           setDrawRefusal(
-            `Cumulative limit reached: you have surveyed ${formatNumber(cumulativeAreaKm2.km2, 2)} km² this month. Adding ${formatNumber(area, 2)} km² would reach ${formatNumber(total, 2)} km² (limit: ${MAX_CUMULATIVE_AREA_KM2} km²).`,
+            tRef.current("cumulativeLimitReached", {
+              surveyed: formatNumber(cumulativeAreaKm2.km2, 2),
+              adding: formatNumber(area, 2),
+              total: formatNumber(total, 2),
+              limit: MAX_CUMULATIVE_AREA_KM2,
+            }),
           );
           return;
         }
@@ -1151,7 +1179,7 @@ export function TerritoryMap({
         // exactly when the screen must already show that work has started.
         setSectorInProgress({
           frame: bbox,
-          name: sectorNameRef.current.trim() || "Unnamed sector",
+          name: sectorNameRef.current.trim() || tRef.current("unnamedSector"),
         });
         setSurveyLoop(true);
         startTransition(() => {
@@ -1213,14 +1241,14 @@ export function TerritoryMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || styleVersion === 0) return;
-    pushData(map, SOURCE_TARGETS, targetsToGeoJSON(targets, selectedId, standardDealCents));
-  }, [styleVersion, targets, selectedId, standardDealCents]);
+    pushData(map, SOURCE_TARGETS, targetsToGeoJSON(targets, selectedId, standardDealCents, t));
+  }, [styleVersion, targets, selectedId, standardDealCents, t]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || styleVersion === 0) return;
-    pushData(map, SOURCE_CLUSTERS, clustersToGeoJSON(clusters));
-  }, [styleVersion, clusters]);
+    pushData(map, SOURCE_CLUSTERS, clustersToGeoJSON(clusters, t));
+  }, [styleVersion, clusters, t]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1516,7 +1544,8 @@ export function TerritoryMap({
 
   const sectorHere =
     sectors.find((sector) => frameToText(sector.bbox) === frameText) ?? null;
-  const nameHere = sectorHere?.label?.trim() || (sectorHere ? "this sector" : "this view");
+  const nameHere =
+    sectorHere?.label?.trim() || (sectorHere ? t("thisSector") : t("thisView"));
 
   // A deleted sector leaves two things pointed at nothing: its own survey
   // banner, if still showing, and the `frame` param, if that was the view
@@ -1572,7 +1601,7 @@ export function TerritoryMap({
 
   const leftRail = (
     <aside className="territory__rail" data-open={railOpen ? "yes" : "no"}>
-      <div className="territory__tabs" role="tablist" aria-label="Side panel">
+      <div className="territory__tabs" role="tablist" aria-label={t("sidePanel")}>
         <button
           type="button"
           role="tab"
@@ -1580,7 +1609,7 @@ export function TerritoryMap({
           className="territory__tab"
           onClick={() => setRailTab("sectors")}
         >
-          <Badge>Sectors</Badge>
+          <Badge>{t("sectorsTab")}</Badge>
         </button>
         <button
           type="button"
@@ -1589,7 +1618,7 @@ export function TerritoryMap({
           className="territory__tab"
           onClick={() => setRailTab("businesses")}
         >
-          <Badge>Businesses</Badge>
+          <Badge>{t("businessesTab")}</Badge>
         </button>
       </div>
 
@@ -1654,7 +1683,7 @@ export function TerritoryMap({
             className="map__canvas"
             data-collapsed={fallback ? "yes" : "no"}
             data-drawing={drawMode ? "yes" : "no"}
-            aria-label="Territory map"
+            aria-label={t("territoryMap")}
             role="application"
           />
 
@@ -1680,33 +1709,24 @@ export function TerritoryMap({
 
           {mapSilent && !fallback ? (
             <div className="map__silent panel" role="status">
-              <Badge asChild><h2>The map is not painting</h2></Badge>
+              <Badge asChild><h2>{t("mapNotPainting")}</h2></Badge>
               <p className="t-body">
-                The base map showed nothing after{" "}
-                {Math.round(PAINT_TIMEOUT_MS / 1000)}
-                {" seconds. "}
-                This is not a territory failure: the businesses are read correctly, only
-                their mapping is missing. An old graphics driver, a network blocking
-                the tiles or a restricted browser is enough.
+                {t("mapNotPaintingBody", { seconds: Math.round(PAINT_TIMEOUT_MS / 1000) })}
               </p>
               <div className="map__work-actions">
                 <Button
                   variant="primary"
                   size="compact"
-                  onClick={() =>
-                    setFallback(
-                      "The base map never answered on this machine.",
-                    )
-                  }
+                  onClick={() => setFallback(t("mapNeverAnswered"))}
                 >
-                  Switch to the list
+                  {t("switchToList")}
                 </Button>
                 <Button
                   variant="quiet"
                   size="compact"
                   onClick={() => setMapSilent(false)}
                 >
-                  Keep waiting
+                  {t("keepWaiting")}
                 </Button>
               </div>
             </div>
@@ -1723,11 +1743,11 @@ export function TerritoryMap({
                 variant="primary"
                 size="compact"
                 className="tooltip tooltip--below"
-                aria-label="Search in this area — read the businesses inside the current view"
+                aria-label={t("searchThisAreaAria")}
                 disabled={inTransition}
                 onClick={resurveyThisView}
               >
-                {inTransition ? "Searching…" : "Search in this area"}
+                {inTransition ? t("searching") : t("searchThisArea")}
               </Button>
             </div>
           ) : null}
@@ -1744,7 +1764,7 @@ export function TerritoryMap({
                   <button
                     type="button"
                     className="menu__trigger tooltip tooltip--left"
-                    aria-label="Settings and account"
+                    aria-label={t("settingsAndAccountAria")}
                   >
                     <Ellipsis className="menu__icon" aria-hidden="true" />
                   </button>
@@ -1757,7 +1777,7 @@ export function TerritoryMap({
                     aria-expanded={toolsOpen}
                     onClick={() => setToolsOpen((open) => !open)}
                   >
-                    Activity codes
+                    {t("activityCodes")}
                   </DropdownMenuItem>
 
                   {/* The API key and the price grid drive every amount on this
@@ -1765,7 +1785,7 @@ export function TerritoryMap({
                       before each survey, these change a few times a year. */}
                   <DropdownMenuItem asChild>
                     <Link href={"/settings" as Route}>
-                      Settings
+                      {t("settingsLink")}
                       <ArrowRight className="ml-auto" aria-hidden="true" />
                     </Link>
                   </DropdownMenuItem>
@@ -1774,7 +1794,7 @@ export function TerritoryMap({
                       manage, and the quota prop is its own billing switch. */}
                   {cumulativeAreaKm2 !== null ? (
                     <DropdownMenuItem asChild>
-                      <Link href={"/billing" as Route}>Billing</Link>
+                      <Link href={"/billing" as Route}>{t("billingLink")}</Link>
                     </DropdownMenuItem>
                   ) : null}
 
@@ -1799,7 +1819,7 @@ export function TerritoryMap({
                 type="button"
                 className="map__control tooltip tooltip--left"
                 aria-pressed={drawMode}
-                aria-label={drawMode ? "Cancel the drawing (Esc)" : "Draw a sector"}
+                aria-label={drawMode ? t("cancelDrawingAria") : t("drawSectorAria")}
                 onClick={() => {
                   setDrawRefusal(null);
                   setDrawMode((mode) => !mode);
@@ -1812,7 +1832,7 @@ export function TerritoryMap({
                 type="button"
                 className="map__control map__rail-toggle tooltip tooltip--left"
                 aria-pressed={railOpen}
-                aria-label={railOpen ? "Close the side panel" : "Open the side panel"}
+                aria-label={railOpen ? t("closeSidePanelAria") : t("openSidePanelAria")}
                 onClick={() => setRailOpen((open) => !open)}
               >
                 <PanelIcon />
@@ -1826,8 +1846,12 @@ export function TerritoryMap({
                  "12km²" with no warning. */
               <p className="t-body-s map__hint">
                 {cumulativeAreaKm2 !== null
-                  ? `Drag to draw a rectangle. ${MAX_ZONE_AREA_KM2} km² per sector, ${MAX_CUMULATIVE_AREA_KM2} km² total per month (${formatNumber(cumulativeAreaKm2.km2, 1)} km² already surveyed).`
-                  : `Drag to draw a rectangle. ${MAX_ZONE_AREA_KM2} km² at most, or the API saturates its 10 000 results and returns an incomplete sector without saying so.`}
+                  ? t("drawHintWithCumulative", {
+                      max: MAX_ZONE_AREA_KM2,
+                      maxCumulative: MAX_CUMULATIVE_AREA_KM2,
+                      surveyed: formatNumber(cumulativeAreaKm2.km2, 1),
+                    })
+                  : t("drawHint", { max: MAX_ZONE_AREA_KM2 })}
               </p>
             ) : null}
 
@@ -1839,7 +1863,7 @@ export function TerritoryMap({
 
             {toolsOpen ? (
               <div className="map__settings panel">
-                <Badge asChild><h3>Activities queried</h3></Badge>
+                <Badge asChild><h3>{t("activitiesQueried")}</h3></Badge>
                 <ul className="map__naf">
                   {naf.map((activity) => {
                     const check = chosenNaf.includes(activity.code);
@@ -1866,12 +1890,12 @@ export function TerritoryMap({
                 </ul>
 
                 <label className="map__field">
-                  <Badge>Sector name</Badge>
+                  <Badge>{t("sectorNameLabel")}</Badge>
                   <input
                     className="map__input"
                     value={sectorName}
                     onChange={(event) => setSectorName(event.target.value)}
-                    placeholder="Centre-ville"
+                    placeholder={t("sectorNamePlaceholder")}
                     maxLength={120}
                   />
                 </label>
@@ -1882,15 +1906,9 @@ export function TerritoryMap({
                   disabled={enrichPending || enrichLoop}
                   onClick={startEnrichment}
                 >
-                  {enrichLoop ? "Enriching…" : "Enrich this frame"}
+                  {enrichLoop ? t("enriching") : t("enrichThisFrame")}
                 </Button>
-                <p className="t-body-s tone-3">
-                  Google first, then the in-house site audit. Enrichment needs a
-                  Google Places key — add one in Settings, or set
-                  GOOGLE_PLACES_API_KEY. Google is the only source of a website
-                  address, and the audit has nothing to read without one. It advances
-                  nobody — it only adds facts.
-                </p>
+                <p className="t-body-s tone-3">{t("enrichExplainer")}</p>
               </div>
             ) : null}
           </div>
@@ -1898,40 +1916,37 @@ export function TerritoryMap({
           {surveyRun || surveyPending || (surveyState.message && !surveyDismissed) ? (
             <div className="map__work panel" role="status" aria-live="polite">
               <Badge asChild>
-                <h3>
-                  {surveyLoop || surveyPending ? "Survey running" : "Survey"}
-                </h3>
+                <h3>{surveyLoop || surveyPending ? t("surveyRunning") : t("survey")}</h3>
               </Badge>
 
               {surveyRun ? (
                 <>
                   <p className="t-body tnum">
-                    Page {surveyRun.page}
-                    {estimatedPages ? ` of ~${estimatedPages}` : ""} · {surveyRun.found}{" "}
-                    businesses read · {surveyRun.created} new
+                    {estimatedPages
+                      ? t("pageOfEstimated", { page: surveyRun.page, estimated: estimatedPages })
+                      : t("pageOnly", { page: surveyRun.page })}
+                    {" · "}
+                    {t("businessesReadCount", { count: surveyRun.found })}
+                    {" · "}
+                    {t("newCount", { count: surveyRun.created })}
                   </p>
                   <Gauge
                     value={surveyProgress}
                     tint="var(--accent)"
                     valueText={percent(surveyProgress * 100)}
-                    name="Progress"
+                    name={t("progress")}
                   />
                   <p className="t-body-s tone-2 tnum">
-                    {surveyRun.requests} calls made
+                    {t("callsMade", { count: surveyRun.requests })}
                     {surveyRun.outsidePolygon > 0
-                      ? ` · ${surveyRun.outsidePolygon} outside the drawn shape`
+                      ? ` · ${t("outsideDrawnShape", { count: surveyRun.outsidePolygon })}`
                       : ""}
                   </p>
                   {surveyRun.saturated ? (
-                    <p className="t-body-s map__refusal">
-                      The sector saturates the API’s 10 000 results: some are missing,
-                      and we do not know how many. Cut it smaller.
-                    </p>
+                    <p className="t-body-s map__refusal">{t("surveySaturated")}</p>
                   ) : null}
                   {surveyRun.truncated ? (
-                    <p className="t-body-s map__refusal">
-                      A ceiling cut the survey short: businesses are missing.
-                    </p>
+                    <p className="t-body-s map__refusal">{t("surveyTruncated")}</p>
                   ) : null}
                 </>
               ) : null}
@@ -1952,12 +1967,12 @@ export function TerritoryMap({
                       setSurveyLoop(false);
                     }}
                   >
-                    Stop
+                    {t("stop")}
                   </Button>
                 ) : null}
                 {!surveyLoop && surveyRun && surveyRun.nextPage !== null ? (
                   <Button variant="primary" size="compact" onClick={resumeSurvey}>
-                    Resume page {surveyRun.nextPage}
+                    {t("resumePage", { page: surveyRun.nextPage })}
                   </Button>
                 ) : null}
               </div>
@@ -1966,16 +1981,17 @@ export function TerritoryMap({
 
           {enrichment || enrichState.message ? (
             <div className="map__work panel" role="status" aria-live="polite">
-              <Badge asChild><h3>Enrichment</h3></Badge>
+              <Badge asChild><h3>{t("enrichment")}</h3></Badge>
               {enrichment ? (
                 <p className="t-body tnum">
-                  {enrichment.enriched} enriched · {enrichment.remaining}{" "}
-                  remaining
+                  {t("enrichedCount", { count: enrichment.enriched })}
+                  {" · "}
+                  {t("remainingCount", { count: enrichment.remaining })}
                   {enrichment.unreachable > 0
-                    ? ` · ${enrichment.unreachable} with nothing to query`
+                    ? ` · ${t("unreachableCount", { count: enrichment.unreachable })}`
                     : ""}
                   {enrichment.purged > 0
-                    ? ` · ${enrichment.purged} purged (30 days)`
+                    ? ` · ${t("purgedCount", { count: enrichment.purged })}`
                     : ""}
                 </p>
               ) : null}
@@ -1993,7 +2009,7 @@ export function TerritoryMap({
                     setEnrichLoop(false);
                   }}
                 >
-                  Stop
+                  {t("stop")}
                 </Button>
               ) : null}
             </div>

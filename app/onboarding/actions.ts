@@ -4,6 +4,7 @@
 // action: a Server Action is a directly reachable HTTP endpoint.
 
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/accounts";
@@ -19,15 +20,15 @@ import {
 
 import type { PlacesKeyState } from "./state";
 
-const keySchema = z.object({
-  key: z
-    .string()
-    .min(20, "A Google Places key is at least 20 characters.")
-    .max(2048)
-    .refine((v) => !/\s/.test(v), {
-      message: "The key must not contain whitespace.",
-    }),
-});
+function keySchema(t: Awaited<ReturnType<typeof getTranslations<"PlacesKeyValidation">>>) {
+  return z.object({
+    key: z
+      .string()
+      .min(20, t("tooShort"))
+      .max(2048)
+      .refine((v) => !/\s/.test(v), { message: t("hasWhitespace") }),
+  });
+}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -40,13 +41,14 @@ export async function testPlacesKeyAction(
   formData: FormData,
 ): Promise<PlacesKeyState> {
   await requireUser();
+  const t = await getTranslations("PlacesKeyValidation");
 
-  const parsed = keySchema.safeParse({ key: text(formData, "key") });
+  const parsed = keySchema(t).safeParse({ key: text(formData, "key") });
   if (!parsed.success) {
     return {
       status: "error",
       message: null,
-      fieldError: parsed.error.issues[0]?.message ?? "Unreadable key.",
+      fieldError: parsed.error.issues[0]?.message ?? t("unreadable"),
     };
   }
 
@@ -54,7 +56,7 @@ export async function testPlacesKeyAction(
   if (result.ok) {
     return {
       status: "tested",
-      message: "Key accepted by Google. You can save it.",
+      message: t("accepted"),
       fieldError: null,
     };
   }
@@ -67,13 +69,14 @@ export async function savePlacesKeyAction(
   formData: FormData,
 ): Promise<PlacesKeyState> {
   const owner = await requireUser();
+  const t = await getTranslations("PlacesKeyValidation");
 
-  const parsed = keySchema.safeParse({ key: text(formData, "key") });
+  const parsed = keySchema(t).safeParse({ key: text(formData, "key") });
   if (!parsed.success) {
     return {
       status: "error",
       message: null,
-      fieldError: parsed.error.issues[0]?.message ?? "Unreadable key.",
+      fieldError: parsed.error.issues[0]?.message ?? t("unreadable"),
     };
   }
 

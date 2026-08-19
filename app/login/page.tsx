@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { Gate } from "@/components/gate/Gate";
 import { signupState, getUser } from "@/lib/accounts";
@@ -34,19 +35,22 @@ export default async function SignInPage() {
   // the FIRST account.
   if (signup.isFirstAccount) redirect("/signup");
 
+  const t = await getTranslations("SignInPage");
+
   return (
     <Gate
-      title="Enter the field"
-      subtitle="Your sectors are where you left them."
+      title={t("title")}
+      subtitle={t("subtitle")}
       toggle={
-        signup.open ? (
-          <>
-            No account yet?{" "}
-            <Link href="/signup" className={styles.link}>
-              Create one
-            </Link>
-          </>
-        ) : null
+        signup.open
+          ? t.rich("toggle", {
+              link: (chunks) => (
+                <Link href="/signup" className={styles.link}>
+                  {chunks}
+                </Link>
+              ),
+            })
+          : null
       }
     >
       {/* useSearchParams forces client rendering: without this boundary the

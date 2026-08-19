@@ -90,6 +90,22 @@
   margin: 0;
 }
 
+.localeSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.localeSwitcher select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background: var(--surface-1);
+  font-size: 13px;
+  font-family: var(--typeface-mono);
+  color: var(--text-1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .message {
     animation: none;

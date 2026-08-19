@@ -2,6 +2,7 @@
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button, RollingAmount } from "@/components/ui";
@@ -12,44 +13,26 @@ import { centsToEuros, readGridForm, sameGrid, type GridForm } from "./form";
 import { INITIAL_PRICE_GRID_STATE } from "./state";
 import { Witness } from "./Witness";
 
+type FieldKey =
+  | "baseCents"
+  | "fullSiteCents"
+  | "multiPageCents"
+  | "multiAddressCents"
+  | "recurringBaseCents";
+
 type EditedField = {
-  key: keyof PriceGrid;
+  key: FieldKey & keyof PriceGrid;
   tab: string;
   label: string;
   when: string;
 };
 
-const FIELDS: EditedField[] = [
-  {
-    key: "baseCents",
-    tab: "Base",
-    label: "Base tier",
-    when: "One address, few reviews, no usable photo — the lowest deal you would sign.",
-  },
-  {
-    key: "fullSiteCents",
-    tab: "Full site",
-    label: "Full site",
-    when: "One address, a site to build. The offer that sells most often, and the yardstick a target's dot size on the map is measured against.",
-  },
-  {
-    key: "multiPageCents",
-    tab: "Multi-page",
-    label: "Multi-page site",
-    when: "From six pages: detailed menu, forms, booking — a structure rather than a storefront.",
-  },
-  {
-    key: "multiAddressCents",
-    tab: "Multi-address",
-    label: "Multi-address site",
-    when: "Two to five addresses. The work changes in nature, not just in volume.",
-  },
-  {
-    key: "recurringBaseCents",
-    tab: "Monthly",
-    label: "Monthly base",
-    when: "Hosting, domain, backups, small fixes. Deliberately low: it keeps the relationship open, it is not where the margin is.",
-  },
+const FIELD_KEYS: readonly FieldKey[] = [
+  "baseCents",
+  "fullSiteCents",
+  "multiPageCents",
+  "multiAddressCents",
+  "recurringBaseCents",
 ];
 
 const LEAVE_AFTER_MS = 5000;
@@ -63,6 +46,14 @@ export function PriceGridForm({
   grid: PriceGrid;
   witnesses: Record<string, StepWitness>;
 }) {
+  const t = useTranslations("PriceGridForm");
+  const FIELDS: EditedField[] = FIELD_KEYS.map((key) => ({
+    key,
+    tab: t(`${key}Tab`),
+    label: t(`${key}Label`),
+    when: t(`${key}When`),
+  }));
+
   const [state, action, inProgress] = useActionState(
     savePriceGridAction,
     INITIAL_PRICE_GRID_STATE,
@@ -138,7 +129,7 @@ export function PriceGridForm({
         className="pricing__layout"
         data-smash={smash === 0 ? undefined : smash % 2 === 0 ? "a" : "b"}
         onChange={(event) =>
-          setRead(readGridForm(new FormData(event.currentTarget), grid))
+          setRead(readGridForm(new FormData(event.currentTarget), grid, t))
         }
       >
         <div
@@ -187,7 +178,9 @@ export function PriceGridForm({
             <button
               type="button"
               className="pricing__arrow"
-              aria-label={`Previous: ${FIELDS[(step - 1 + FIELDS.length) % FIELDS.length]!.label}`}
+              aria-label={t("previousAria", {
+                label: FIELDS[(step - 1 + FIELDS.length) % FIELDS.length]!.label,
+              })}
               onClick={() => goTo(step - 1, "back")}
             >
               <Chevron />
@@ -222,7 +215,9 @@ export function PriceGridForm({
               type="button"
               className="pricing__arrow"
               data-next
-              aria-label={`Next: ${FIELDS[(step + 1) % FIELDS.length]!.label}`}
+              aria-label={t("nextAria", {
+                label: FIELDS[(step + 1) % FIELDS.length]!.label,
+              })}
               onClick={() => goTo(step + 1, "forward")}
             >
               <Chevron />
@@ -248,11 +243,11 @@ export function PriceGridForm({
               className="pricing__save"
               disabled={inProgress || (hydrated && !dirty)}
             >
-              {inProgress ? "Saving…" : "Save the grid"}
+              {inProgress ? t("saving") : t("save")}
             </Button>
             {state.saved && !dirty ? (
               <p className="pricing__confirm t-body-s" role="status">
-                {"Saved. The map already follows."}
+                {t("savedNotice")}
               </p>
             ) : null}
           </div>
@@ -282,12 +277,10 @@ export function PriceGridForm({
 
               <div className="pricing__done-body">
                 <h2 id="pricing-done-title" className="t-title-2">
-                  {state.error ? "Grid not saved" : "Grid saved"}
+                  {state.error ? t("gridNotSaved") : t("gridSaved")}
                 </h2>
                 <p className="t-body-s">
-                  {state.error
-                    ? state.error
-                    : "Every price on the map already follows it."}
+                  {state.error ? state.error : t("appliedEverywhere")}
                 </p>
 
                 <div className="pricing__done-act">
@@ -298,7 +291,7 @@ export function PriceGridForm({
                     autoFocus
                     onClick={() => router.push("/" as Route)}
                   >
-                    {"Back to the map"}
+                    {t("backToMap")}
                   </Button>
                   <Button
                     type="button"
@@ -306,7 +299,7 @@ export function PriceGridForm({
                     size="compact"
                     onClick={() => setFinishing(false)}
                   >
-                    {"Stay here"}
+                    {t("stayHere")}
                   </Button>
                 </div>
               </div>

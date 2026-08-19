@@ -90,6 +90,17 @@ not a recommendation.
 
 ---
 
+## Language
+
+French and English, switched per account on `/settings` — never a `[locale]`
+URL segment, since the preference lives on the account (`accountSettings.locale`),
+not the browser. Signed-out screens (login, signup, password reset) render in
+French, the default. Amounts and dates stay pinned to `fr-FR` / `Europe/Paris`
+regardless of the interface language: the underlying data — French addresses,
+SIRENE facts — does not change with the viewer's language either.
+
+---
+
 ## Data rules
 
 Enforced in code, not negotiable:

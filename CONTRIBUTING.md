@@ -69,6 +69,9 @@ Two rules about the benches:
 - TypeScript, no `any`; narrow unions over wide types; keys are string literal
   unions, never bare `string`.
 - Identifiers, filenames and comments in English.
+- User-facing text goes through next-intl (`useTranslations` /
+  `getTranslations`), never a hardcoded string — see "Interface through
+  next-intl, numbers French" below.
 - Comments say what the code cannot: a trap, a measured fact, a reason — never
   narrate the line below.
 - Server Components by default; `"use client"` only where an interaction needs
@@ -120,13 +123,25 @@ Enforced by [commitlint](commitlint.config.js) + [Husky](.husky/commit-msg):
 
 ---
 
-## Interface English, numbers French
+## Interface through next-intl, numbers French
 
-Screens, buttons, error messages and price reasons are English. `lib/format.ts`
-is pinned to `fr-FR` / `Europe/Paris` and does not move — changing it reopens a
-hydration mismatch on every amount. Keys are short, lowercase, ASCII and
-space-free; labels are visible text; the two never mix, and a renamed key
-orphans every row already written. Details in
+Every user-facing string goes through next-intl — `useTranslations` in a
+client component, `getTranslations` in a server component or Server Action —
+namespaced per component, added to **both** `messages/en.json` and
+`messages/fr.json` in the same pull request. Never a hardcoded literal in
+JSX, an `aria-label`, a toast, or an action's returned error message. This
+applies whether the code was written by hand or by an AI assistant.
+`lib/format.ts` stays pinned to `fr-FR` / `Europe/Paris` regardless of UI
+language — changing it reopens a hydration mismatch on every amount, and the
+underlying data does not change with the viewer's language anyway. Keys are
+short, lowercase, ASCII and space-free; labels are visible text; the two
+never mix, and a renamed key orphans every row already written.
+`lib/scoring.ts` is the one exception: it is read by `scripts/verify-scoring.mts`
+outside any Next.js request, where next-intl cannot be called, so it returns a
+stable key/params pair instead of translated text, for the UI to translate.
+`lib/harvest.ts`, `lib/billing/quotas.ts` and `app/actions.ts` always run in a
+real request and call `getTranslations()` directly like everything else.
+Details in
 [`ARCHITECTURE.md`](ARCHITECTURE.md#interface-conventions).
 
 ---
@@ -159,6 +174,10 @@ Each cost a real bug; all are documented at length in
 - Scoring change: `verify:scoring` must still land on the five real deals.
 - New table with `owner_id`: extend `verify-tenancy.mts` in the same pull
   request.
+- New or changed user-facing string: goes through next-intl, added to BOTH
+  `messages/en.json` and `messages/fr.json` in the same pull request — never
+  hardcoded. Check both files diff together; a PR that touches one without
+  the other is incomplete.
 - Schema change: run `npm run db:generate` and commit the SQL under `drizzle/`
   — `db:push` is a local convenience, `npm start` applies the committed
   migrations.

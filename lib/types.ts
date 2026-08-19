@@ -184,7 +184,11 @@ export type PriceOffer =
   | "by-quote";
 
 export type PriceAdjustment = {
+  /** English, used by the "copy as prompt" export. */
   label: string;
+  /** Stable id for the UI to translate through `PriceReasons` messages. */
+  key: string;
+  params?: Record<string, string | number>;
   amountCents: number;
 };
 
@@ -198,12 +202,26 @@ export type PriceEstimate = {
   recurringCents: number;
   /** `priceCents + valueHorizonMonths * recurringCents`. */
   value12MonthsCents: number;
+  /** English, used by the "copy as prompt" export. */
   reason: string;
+  /** Stable id for the UI to translate through `PriceReasons` messages. */
+  reasonKey: string;
+  reasonParams?: Record<string, string | number>;
   adjustments: PriceAdjustment[];
 };
 
+/** `lootReason()`'s return: stable id + params, translated by the caller (never English on the wire). */
+export type LootReason = {
+  key: string;
+  params: Record<string, string | number>;
+};
+
 export type SuccessFactor = {
+  /** English, used by the dev scripts and the "copy as prompt" export. */
   label: string;
+  /** Stable id for the UI to translate through `SuccessFactors` messages. */
+  key: string;
+  params?: Record<string, string | number>;
   value: number;
 };
 
@@ -264,6 +282,11 @@ export type ZoneStatus = (typeof ZONE_STATUSES)[number];
 // access to another account's rows. Tenancy goes through `owner_id` alone.
 export const USER_ROLES = ["owner", "member"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
+
+// UI text only: number/date formatting stays pinned to French regardless of this setting.
+export const LOCALES = ["en", "fr"] as const;
+export type Locale = (typeof LOCALES)[number];
+export const DEFAULT_LOCALE: Locale = "fr";
 
 // Mirrors the Mollie subscription lifecycle; "pending" also covers a first
 // payment whose checkout was never completed. A missing row means "none".

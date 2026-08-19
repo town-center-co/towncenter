@@ -12,6 +12,7 @@
 // integer cents.
 
 import { refresh } from "next/cache";
+import { getTranslations } from "next-intl/server";
 
 import { requireUser } from "@/lib/accounts";
 
@@ -32,7 +33,7 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 
-import { plural, STATE_LABEL } from "@/components/map/text";
+import { stateLabel } from "@/components/map/text";
 import {
   db,
   events,
@@ -79,6 +80,8 @@ import type {
   SectorResult,
 } from "./actionState";
 
+type ActionMessagesT = Awaited<ReturnType<typeof getTranslations<"ActionMessages">>>;
+
 // Duration cap for one enrichment call; ENRICH_BATCH_SIZE caps the count. Both
 // are needed: a slow site can blow a proxy timeout long before the batch fills.
 // Checked before each business, never mid-way.
@@ -106,12 +109,14 @@ function refreshTree(): void {
 function fail(
   previous: ActionState,
   message: string,
+  messageKey: string,
   fieldErrors: Record<string, string> = {},
   values: Record<string, string> = {},
 ): ActionState {
   return {
     status: "error",
     message,
+    messageKey,
     fieldErrors,
     values,
     result: null,
@@ -125,11 +130,13 @@ function fail(
 function partial(
   previous: ActionState,
   message: string,
+  messageKey: string,
   result: ActionResult,
 ): ActionState {
   return {
     status: "error",
     message,
+    messageKey,
     fieldErrors: {},
     values: {},
     result,
@@ -141,11 +148,13 @@ function partial(
 function done(
   previous: ActionState,
   message: string,
+  messageKey: string,
   result: ActionResult | null,
 ): ActionState {
   return {
     status: "success",
     message,
+    messageKey,
     fieldErrors: {},
     values: {},
     result,
@@ -172,14 +181,43 @@ function json(form: FormData, name: string): unknown {
 // zod messages keyed by the control's `name` attribute; a nested path
 // (frame.minLat) collapses to its root, otherwise the error renders next to
 // nothing.
-function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
+//
+// A zod schema is module-scope, built at import time, before any request (and
+// therefore any locale) exists — it cannot call `getTranslations()` itself.
+// Its `message:` option is deliberately NOT visible text: it is a stable ASCII
+// key into `ActionMessages` (see `ZOD_MESSAGE_KEY` below), translated here
+// once a real translator is available.
+function fieldErrorsFrom(error: z.ZodError, t: ActionMessagesT): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of error.issues) {
     const key = String(issue.path[0] ?? "_");
-    if (!(key in out)) out[key] = issue.message;
+    if (key in out) continue;
+    // Every schema below sets `message:` to one of ZOD_MESSAGE_KEY's values.
+    // A validator that forgot to would leak zod's own English text
+    // ("Too big: expected number to be <=90") straight into `t()` as if it
+    // were a key — this falls back to a generic translated message instead
+    // of surfacing that as literal untranslated garbage in the UI.
+    out[key] = ZOD_MESSAGE_KEY_SET.has(issue.message)
+      ? t(issue.message as Parameters<typeof t>[0])
+      : t("invalidValue");
   }
   return out;
 }
+
+/** Every zod-schema `message:` below is one of these keys, never real text. */
+const ZOD_MESSAGE_KEY = {
+  unreadableIdentifier: "unreadableIdentifier",
+  unreadableNafCode: "unreadableNafCode",
+  valueTooLong: "valueTooLong",
+  labelTooLong: "labelTooLong",
+  unreadableCoordinate: "unreadableCoordinate",
+  unreadableContour: "unreadableContour",
+  unreadablePageNumber: "unreadablePageNumber",
+  unreadableDestination: "unreadableDestination",
+  amountOutOfRange: "amountOutOfRange",
+  noteTooLong: "noteTooLong",
+} as const;
+const ZOD_MESSAGE_KEY_SET: ReadonlySet<string> = new Set(Object.values(ZOD_MESSAGE_KEY));
 
 // A row id is a crypto.randomUUID(). Checked here and not only by the `where`:
 // an action is a public POST endpoint, and an arbitrary string has no business
@@ -187,37 +225,52 @@ function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
 const idSchema = z
   .string()
   .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, {
-    message: "Unreadable identifier.",
+    message: ZOD_MESSAGE_KEY.unreadableIdentifier,
   });
 
+const coordinate = () =>
+  z.number({ message: ZOD_MESSAGE_KEY.unreadableCoordinate });
+
 const bboxSchema = z.object({
-  minLat: z.number().min(-90).max(90),
-  maxLat: z.number().min(-90).max(90),
-  minLng: z.number().min(-180).max(180),
-  maxLng: z.number().min(-180).max(180),
+  minLat: coordinate().min(-90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  maxLat: coordinate().min(-90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  minLng: coordinate().min(-180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  maxLng: coordinate().min(-180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
 });
 
 const latLngSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+  lat: coordinate().min(-90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(90, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
+  lng: coordinate().min(-180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }).max(180, { message: ZOD_MESSAGE_KEY.unreadableCoordinate }),
 });
 
 // Hand-drawn outline. Three vertices minimum, and the 2 000 ceiling is not
 // cosmetic: every vertex is tested against every business in the frame.
-const polygonSchema = z.array(latLngSchema).min(3).max(2_000);
+const polygonSchema = z
+  .array(latLngSchema, { message: ZOD_MESSAGE_KEY.unreadableContour })
+  .min(3, { message: ZOD_MESSAGE_KEY.unreadableContour })
+  .max(2_000, { message: ZOD_MESSAGE_KEY.unreadableContour });
 
 /** NAF 2008 codes, e.g. `56.10A`. The API rejects NAF 2025 codes. */
 const nafSchema = z
-  .array(z.string().regex(/^\d{2}\.\d{2}[A-Z]$/, { message: "Unreadable NAF code." }))
+  .array(
+    z
+      .string()
+      .regex(/^\d{2}\.\d{2}[A-Z]$/, { message: ZOD_MESSAGE_KEY.unreadableNafCode }),
+  )
   .max(40);
 
 const surveySchema = z.object({
   frame: bboxSchema.optional(),
   contour: polygonSchema.nullish(),
   naf: nafSchema.nullish(),
-  label: z.string().max(120).nullish(),
+  label: z.string().max(120, { message: ZOD_MESSAGE_KEY.labelTooLong }).nullish(),
   zoneId: idSchema.nullish(),
-  page: z.number().int().min(1).max(10_000).nullish(),
+  page: z
+    .number({ message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .int({ message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .min(1, { message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .max(10_000, { message: ZOD_MESSAGE_KEY.unreadablePageNumber })
+    .nullish(),
 });
 
 const frameSchema = z.object({ frame: bboxSchema });
@@ -228,7 +281,7 @@ const targetSchema = z.object({ id: idSchema });
 const inputSchema = z.object({
   id: idSchema,
   field: z.enum(["website", "phone"]),
-  value: z.string().max(500, { message: "500 characters at most." }),
+  value: z.string().max(500, { message: ZOD_MESSAGE_KEY.valueTooLong }),
 });
 
 // The label is visible text, not a key. The 120-character ceiling matches the
@@ -236,16 +289,23 @@ const inputSchema = z.object({
 // same thing. An empty label erases the name and is stored as null, never "".
 const renameSchema = z.object({
   id: idSchema,
-  label: z.string().max(120, { message: "120 characters at most." }),
+  label: z.string().max(120, { message: ZOD_MESSAGE_KEY.labelTooLong }),
 });
 
 // The only destinations of an advance. `spotted` is the starting state and is
 // never returned to; `dismissed` belongs to dismissTargetAction, not here.
 const advanceSchema = z.object({
   id: idSchema,
-  to: z.enum(["studied", "engaged", "taken", "withdrawn"]),
-  amountCents: z.number().int().min(0).max(1_000_000_000).nullish(),
-  note: z.string().max(2_000).nullish(),
+  to: z.enum(["studied", "engaged", "taken", "withdrawn"], {
+    message: ZOD_MESSAGE_KEY.unreadableDestination,
+  }),
+  amountCents: z
+    .number({ message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .int({ message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .min(0, { message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .max(1_000_000_000, { message: ZOD_MESSAGE_KEY.amountOutOfRange })
+    .nullish(),
+  note: z.string().max(2_000, { message: ZOD_MESSAGE_KEY.noteTooLong }).nullish(),
 });
 
 /**
@@ -311,6 +371,7 @@ export async function harvestZoneAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   // input echoed back: a refusal must not erase an outline that took ten clicks
   const values: Record<string, string> = {
@@ -326,7 +387,13 @@ export async function harvestZoneAction(
   // harvested-targets ceiling. The area ceiling lives in openZone.
   const harvestQuota = await checkQuota("harvest", owner.id);
   if (!harvestQuota.allowed) {
-    return fail(previous, harvestQuota.message ?? "Quota reached.", {}, values);
+    return fail(
+      previous,
+      harvestQuota.message ?? t("quotaReachedFallback"),
+      "quotaReachedFallback",
+      {},
+      values,
+    );
   }
 
   const pageRaw = field(formData, "page");
@@ -342,8 +409,9 @@ export async function harvestZoneAction(
   if (!parsed.success) {
     return fail(
       previous,
-      "Unreadable sector. Draw it again on the map.",
-      fieldErrorsFrom(parsed.error),
+      t("unreadableSector"),
+      "unreadableSector",
+      fieldErrorsFrom(parsed.error, t),
       values,
     );
   }
@@ -362,8 +430,9 @@ export async function harvestZoneAction(
     if (input.page === null || input.page === undefined) {
       return fail(
         previous,
-        "Cannot resume: the resume page is missing.",
-        { page: "Give the page to resume from." },
+        t("cannotResumeMissingPage"),
+        "cannotResumeMissingPage",
+        { page: t("givePageToResume") },
         values,
       );
     }
@@ -372,7 +441,8 @@ export async function harvestZoneAction(
     if (!resumed) {
       return fail(
         previous,
-        "This sector is finished or missing. Draw a new one.",
+        t("sectorFinishedOrMissing"),
+        "sectorFinishedOrMissing",
         {},
         values,
       );
@@ -387,8 +457,9 @@ export async function harvestZoneAction(
     if (!input.frame) {
       return fail(
         previous,
-        "Draw a sector on the map before surveying it.",
-        { frame: "No sector drawn." },
+        t("drawSectorFirst"),
+        "drawSectorFirst",
+        { frame: t("noSectorDrawn") },
         values,
       );
     }
@@ -402,8 +473,15 @@ export async function harvestZoneAction(
 
     if ("reason" in opened) {
       // a refusal is an answer, not a failure: it carries the actual area and
-      // the ceiling so the user knows how much to tighten
-      return fail(previous, opened.message, { frame: opened.message }, values);
+      // the ceiling so the user knows how much to tighten. The message is
+      // already translated (lib/harvest.ts / lib/billing/quotas.ts).
+      return fail(
+        previous,
+        opened.message,
+        `openZoneRefusal:${opened.reason}`,
+        { frame: opened.message },
+        values,
+      );
     }
 
     zoneId = opened.zoneId;
@@ -441,40 +519,53 @@ export async function harvestZoneAction(
   if (slice.failure) {
     const earned =
       slice.found > 0
-        ? `The ${slice.found} businesses already read are saved.`
-        : "Nothing was lost.";
-    const next = slice.failure.retryable
-      ? " Run it again to resume from that page."
-      : "";
+        ? t("harvestSavedSoFar", { found: slice.found })
+        : t("harvestNothingLost");
+    const next = slice.failure.retryable ? t("harvestRetryHint") : "";
     return partial(
       previous,
-      `${slice.failure.message} Interrupted on page ${slice.failure.page}. ${earned}${next}`,
+      t("harvestInterrupted", {
+        failureMessage: slice.failure.message,
+        page: slice.failure.page,
+        earned,
+        next,
+      }),
+      "harvestInterrupted",
       result,
     );
   }
 
   const notes: string[] = [];
   if (slice.outsidePolygon > 0) {
-    notes.push(`${slice.outsidePolygon} outside the drawn shape`);
+    notes.push(t("outsidePolygonNote", { count: slice.outsidePolygon }));
   }
   if (slice.saturated) {
-    notes.push("the sector saturates the registry’s 10 000 results, cut it smaller");
+    notes.push(t("sectorSaturatedNote"));
   } else if (slice.truncated) {
-    notes.push("a ceiling cut in, some businesses are missing");
+    notes.push(t("ceilingCutNote"));
   }
   const suffix = notes.length > 0 ? ` (${notes.join(" · ")})` : "";
 
   if (slice.nextPage === null) {
     return done(
       previous,
-      `Sector surveyed: ${slice.zoneFound} businesses, ${slice.zoneNew} of them new${suffix}.`,
+      t("sectorSurveyedDone", { found: slice.zoneFound, new: slice.zoneNew, suffix }),
+      "sectorSurveyedDone",
       result,
     );
   }
 
   return done(
     previous,
-    `Pages ${slice.firstPage} to ${slice.lastPage}: ${slice.zoneFound} businesses, ${slice.zoneNew} of them new${suffix}. Continues on page ${slice.nextPage}.`,
+    t("sectorSurveyedContinues", {
+      firstPage: slice.firstPage,
+      lastPage: slice.lastPage,
+      found: slice.zoneFound,
+      new: slice.zoneNew,
+      suffix,
+      nextPage: slice.nextPage,
+    }),
+    "sectorSurveyedContinues",
     result,
   );
 }
@@ -580,12 +671,11 @@ async function enrichOne(
     } catch (error) {
       const fatal = error instanceof PlacesError ? !error.retryable : false;
       console.error(`[google] ${record.siret}`, error);
+      const t = await getTranslations("ActionMessages");
       return {
         status: "failed",
         message:
-          error instanceof PlacesError
-            ? error.message
-            : "Google did not answer.",
+          error instanceof PlacesError ? error.message : t("googleDidNotAnswer"),
         fatal,
       };
     }
@@ -626,11 +716,13 @@ async function enrichOne(
 /** The live states: the only ones worth paying Google for. */
 const LIVE_STATES: readonly TargetState[] = ["spotted", "studied", "engaged"];
 
-const MESSAGE_NO_KEY =
-  "No Google key: enrichment cannot run. Set GOOGLE_PLACES_API_KEY, or add your " +
-  "key on the Setup screen instead — that one needs no restart. Google is the " +
-  "only source of a website address, and without one the in-house site audit " +
-  "has nothing to read. Surveying, directors and the map keep working without it.";
+// Static text, but built at import time (module scope) with no request yet to
+// derive a locale from — same reasoning as `lib/billing/quotas.ts`'s message
+// helpers.
+async function messageNoKey(): Promise<string> {
+  const t = await getTranslations("ActionMessages");
+  return t("noGoogleKey");
+}
 
 function pendingCondition(googleOn: boolean, auditOn = true): SQL {
   const cutoff = new Date(Date.now() - GOOGLE_FRESHNESS_DAYS * 86_400_000);
@@ -668,6 +760,7 @@ export async function enrichZoneAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = { frame: field(formData, "frame") };
   const parsed = frameSchema.safeParse({ frame: json(formData, "frame") });
@@ -675,20 +768,27 @@ export async function enrichZoneAction(
   if (!parsed.success) {
     return fail(
       previous,
-      "Unreadable frame.",
-      fieldErrorsFrom(parsed.error),
+      t("unreadableFrame"),
+      "unreadableFrame",
+      fieldErrorsFrom(parsed.error, t),
       values,
     );
   }
 
   const googleKey = await getPlacesKey(owner.id);
   if (!googleKey) {
-    return fail(previous, MESSAGE_NO_KEY, {}, values);
+    return fail(previous, await messageNoKey(), "noGoogleKey", {}, values);
   }
 
   const enrichQuota = await checkQuota("enrich", owner.id);
   if (!enrichQuota.allowed) {
-    return fail(previous, enrichQuota.message ?? "Quota reached.", {}, values);
+    return fail(
+      previous,
+      enrichQuota.message ?? t("quotaReachedFallback"),
+      "quotaReachedFallback",
+      {},
+      values,
+    );
   }
   // audits ride enrichment: when their quota is out, enrichment carries on
   // and the audit is simply skipped (see pendingCondition).
@@ -741,7 +841,7 @@ export async function enrichZoneAction(
       budgetSpent: false,
     };
     refreshTree();
-    return done(previous, describeEnrich(0, 0, unreachable, purged), result);
+    return done(previous, describeEnrich(t, 0, 0, unreachable, purged), "enrichDescribed", result);
   }
 
   const startedAt = Date.now();
@@ -788,18 +888,25 @@ export async function enrichZoneAction(
   // nothing enriched AND a failure: reporting success would make the client
   // loop on a batch that will not move
   if (enriched === 0 && failure) {
-    return partial(previous, `${failure.message} No record updated.`, result);
+    return partial(
+      previous,
+      t("noRecordUpdated", { failureMessage: failure.message }),
+      "noRecordUpdated",
+      result,
+    );
   }
 
   const alert = failure ? ` ${failure.message}` : "";
   return done(
     previous,
-    describeEnrich(enriched, remaining, unreachable, purged) + alert,
+    describeEnrich(t, enriched, remaining, unreachable, purged) + alert,
+    "enrichDescribed",
     result,
   );
 }
 
 function describeEnrich(
+  t: ActionMessagesT,
   enriched: number,
   remaining: number,
   unreachable: number,
@@ -808,22 +915,18 @@ function describeEnrich(
   const parts: string[] = [];
 
   if (enriched === 0 && remaining === 0) {
-    parts.push("Nothing new to query in this frame.");
+    parts.push(t("nothingNewToQuery"));
   } else {
-    parts.push(
-      `${enriched} ${enriched > 1 ? "records enriched" : "record enriched"}.`,
-    );
-    if (remaining > 0) parts.push(`${remaining} still waiting.`);
+    parts.push(t("recordsEnriched", { count: enriched }));
+    if (remaining > 0) parts.push(t("stillWaiting", { count: remaining }));
   }
 
   if (unreachable > 0) {
-    parts.push(
-      `${unreachable} with nothing to query: Google does not know these addresses and no website is attached.`,
-    );
+    parts.push(t("unreachableRecords", { count: unreachable }));
   }
 
   if (purged > 0) {
-    parts.push(`${purged} records purged (Google data older than 30 days).`);
+    parts.push(t("purgedRecords", { count: purged }));
   }
 
   return parts.join(" ");
@@ -839,12 +942,19 @@ export async function enrichTargetAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = { id: field(formData, "id") };
   const parsed = targetSchema.safeParse({ id: field(formData, "id") });
 
   if (!parsed.success) {
-    return fail(previous, "Business not found.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("businessNotFound"),
+      "businessNotFound",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const [record] = await db
@@ -853,16 +963,22 @@ export async function enrichTargetAction(
     .where(and(eq(targets.ownerId, owner.id), eq(targets.id, parsed.data.id)))
     .limit(1);
 
-  if (!record) return fail(previous, "Business not found.", {}, values);
+  if (!record) return fail(previous, t("businessNotFound"), "businessNotFound", {}, values);
 
   const googleKey = await getPlacesKey(owner.id);
   if (!googleKey) {
-    return fail(previous, MESSAGE_NO_KEY, {}, values);
+    return fail(previous, await messageNoKey(), "noGoogleKey", {}, values);
   }
 
   const enrichQuota = await checkQuota("enrich", owner.id);
   if (!enrichQuota.allowed) {
-    return fail(previous, enrichQuota.message ?? "Quota reached.", {}, values);
+    return fail(
+      previous,
+      enrichQuota.message ?? t("quotaReachedFallback"),
+      "quotaReachedFallback",
+      {},
+      values,
+    );
   }
   const auditAllowed = (await checkQuota("audit", owner.id)).allowed;
 
@@ -890,18 +1006,19 @@ export async function enrichTargetAction(
   refreshTree();
 
   if (outcome.status === "failed") {
-    return partial(previous, `${outcome.message} The record is unchanged.`, result);
-  }
-
-  if (outcome.status === "impossible") {
     return partial(
       previous,
-      "Nothing to query: Google does not know this address and no website is attached. The record is left untouched.",
+      t("recordUnchanged", { failureMessage: outcome.message }),
+      "recordUnchanged",
       result,
     );
   }
 
-  return done(previous, `${record.name}: record enriched.`, result);
+  if (outcome.status === "impossible") {
+    return partial(previous, t("nothingToQueryUntouched"), "nothingToQueryUntouched", result);
+  }
+
+  return done(previous, t("recordEnriched", { name: record.name }), "recordEnriched", result);
 }
 
 /**
@@ -945,6 +1062,7 @@ export async function noteTargetFieldAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = {
     id: field(formData, "id"),
@@ -954,7 +1072,13 @@ export async function noteTargetFieldAction(
 
   const parsed = inputSchema.safeParse(values);
   if (!parsed.success) {
-    return fail(previous, "Unreadable entry.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("unreadableEntry"),
+      "unreadableEntry",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const { id, field: which, value } = parsed.data;
@@ -964,10 +1088,11 @@ export async function noteTargetFieldAction(
     .from(targets)
     .where(and(eq(targets.ownerId, owner.id), eq(targets.id, id)))
     .limit(1);
-  if (!record) return fail(previous, "Business not found.", {}, values);
+  if (!record) return fail(previous, t("businessNotFound"), "businessNotFound", {}, values);
 
   const patch: Partial<NewTarget> = { manualNotedAt: new Date(), updatedAt: new Date() };
   let message: string;
+  let messageKey: string;
 
   if (which === "website") {
     const empty = value.trim() === "";
@@ -976,8 +1101,9 @@ export async function noteTargetFieldAction(
     if (!empty && url === null) {
       return fail(
         previous,
-        "That is not a readable web address.",
-        { value: "Try something like boulangerie-durand.fr" },
+        t("notReadableWebAddress"),
+        "notReadableWebAddress",
+        { value: t("tryExample") },
         values,
       );
     }
@@ -992,17 +1118,13 @@ export async function noteTargetFieldAction(
       patch.auditedAt = null;
     }
 
-    message =
-      url === null
-        ? "Address cleared. Whatever Google returns takes over again."
-        : `Address saved. Fetch the facts to run the site audit on it.`;
+    messageKey = url === null ? "addressCleared" : "addressSaved";
+    message = t(messageKey as Parameters<typeof t>[0]);
   } else {
     const phoneNumber = value.trim();
     patch.manualPhone = phoneNumber === "" ? null : phoneNumber;
-    message =
-      phoneNumber === ""
-        ? "Phone cleared."
-        : "Phone saved. It counts toward reachability from now on.";
+    messageKey = phoneNumber === "" ? "phoneCleared" : "phoneSaved";
+    message = t(messageKey as Parameters<typeof t>[0]);
   }
 
   // nothing hand-typed is left on this record: stamping an entry that clears
@@ -1019,7 +1141,7 @@ export async function noteTargetFieldAction(
     .where(and(eq(targets.ownerId, owner.id), eq(targets.id, id)));
 
   refreshTree();
-  return done(previous, message, null);
+  return done(previous, message, messageKey, null);
 }
 
 // The event follows the state REACHED, not the path taken: jumping straight
@@ -1050,6 +1172,7 @@ export async function advanceTargetAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values: Record<string, string> = {
     id: field(formData, "id"),
@@ -1064,8 +1187,9 @@ export async function advanceTargetAction(
   if (rawAmount !== "" && amountCents === null) {
     return fail(
       previous,
-      "Unreadable amount.",
-      { amount: "An amount in euros, for example 3 500 or 3500,00." },
+      t("unreadableAmount"),
+      "unreadableAmount",
+      { amount: t("amountExample") },
       values,
     );
   }
@@ -1078,33 +1202,41 @@ export async function advanceTargetAction(
   });
 
   if (!parsed.success) {
-    return fail(previous, "Entry refused.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("entryRefused"),
+      "entryRefused",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const { id, to, note } = parsed.data;
 
   const row = await getTargetRow(owner, id);
-  if (!row) return fail(previous, "Business not found.", {}, values);
+  if (!row) return fail(previous, t("businessNotFound"), "businessNotFound", {}, values);
 
   const from = row.state;
 
   if (from === "dismissed") {
     return fail(
       previous,
-      `${row.name} is set aside. Put it back in play before advancing it.`,
+      t("dismissedPutBackFirst", { name: row.name }),
+      "dismissedPutBackFirst",
       {},
       values,
     );
   }
 
   if (from === "taken") {
-    return fail(previous, `${row.name} is already taken.`, {}, values);
+    return fail(previous, t("alreadyTaken", { name: row.name }), "alreadyTaken", {}, values);
   }
 
   if (from === "withdrawn" && to !== "taken") {
     return fail(
       previous,
-      `${row.name} is already withdrawn. Only a signature puts it back in play.`,
+      t("alreadyWithdrawn", { name: row.name }),
+      "alreadyWithdrawn",
       {},
       values,
     );
@@ -1113,7 +1245,8 @@ export async function advanceTargetAction(
   if (to !== "withdrawn" && TARGET_STATE_RANK[to] <= TARGET_STATE_RANK[from]) {
     return fail(
       previous,
-      `${row.name} is already at this step, or beyond. An approach does not go backwards.`,
+      t("alreadyAtStep", { name: row.name }),
+      "alreadyAtStep",
       {},
       values,
     );
@@ -1126,8 +1259,9 @@ export async function advanceTargetAction(
     if (amountCents === null || amountCents <= 0) {
       return fail(
         previous,
-        "Give the amount actually signed: this is the take, not the estimate.",
-        { amount: "Amount required for a take." },
+        t("giveAmountSigned"),
+        "giveAmountSigned",
+        { amount: t("amountRequiredForTake") },
         values,
       );
     }
@@ -1159,7 +1293,8 @@ export async function advanceTargetAction(
   if (updated.length === 0) {
     return fail(
       previous,
-      "This business changed state in the meantime. Reopen the record.",
+      t("stateChangedMeantime"),
+      "stateChangedMeantime",
       {},
       values,
     );
@@ -1202,14 +1337,16 @@ export async function advanceTargetAction(
 
   refreshTree();
 
+  const labels = stateLabel(await getTranslations("TargetLabels"));
+  const messageKey = to === "taken" ? "movesToTaken" : to === "withdrawn" ? "movesToWithdrawn" : "movesTo";
   const message =
     to === "taken"
-      ? `${row.name} is taken.`
+      ? t("movesToTaken", { name: row.name })
       : to === "withdrawn"
-        ? `${row.name}: withdrawal recorded.`
-        : `${row.name} moves to “${STATE_LABEL[to]}”.`;
+        ? t("movesToWithdrawn", { name: row.name })
+        : t("movesTo", { name: row.name, state: labels[to] });
 
-  return done(previous, message, result);
+  return done(previous, message, messageKey, result);
 }
 
 /**
@@ -1226,12 +1363,19 @@ export async function rollbackTargetAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = { id: field(formData, "id") };
   const parsed = targetSchema.safeParse({ id: field(formData, "id") });
 
   if (!parsed.success) {
-    return fail(previous, "Business not found.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("businessNotFound"),
+      "businessNotFound",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const [record] = await db
@@ -1245,14 +1389,15 @@ export async function rollbackTargetAction(
     .where(and(eq(targets.ownerId, owner.id), eq(targets.id, parsed.data.id)))
     .limit(1);
 
-  if (!record) return fail(previous, "Business not found.", {}, values);
+  if (!record) return fail(previous, t("businessNotFound"), "businessNotFound", {}, values);
 
   if (record.state === "dismissed") {
     // `dismissed` is justified by no fact: it is set by hand and undone by hand.
     // Erasing a fact under it would change nothing visible.
     return fail(
       previous,
-      `${record.name} is set aside: its state does not come from the log. Put it back in play first.`,
+      t("dismissedNotFromLog", { name: record.name }),
+      "dismissedNotFromLog",
       {},
       values,
     );
@@ -1278,7 +1423,8 @@ export async function rollbackTargetAction(
   if (!last) {
     return fail(
       previous,
-      `${record.name} has no fact in the log: there is nothing to undo.`,
+      t("noFactToUndo", { name: record.name }),
+      "noFactToUndo",
       {},
       values,
     );
@@ -1290,7 +1436,8 @@ export async function rollbackTargetAction(
   if (last.kind === "survey") {
     return fail(
       previous,
-      `${record.name} has only its spotting in the log, and a spotting cannot be undone: the business really was found. Set it aside if you no longer want to see it.`,
+      t("spottingCannotBeUndone", { name: record.name }),
+      "spottingCannotBeUndone",
       {},
       values,
     );
@@ -1306,7 +1453,8 @@ export async function rollbackTargetAction(
     // success would return the same progress twice
     return fail(
       previous,
-      "This fact was just undone elsewhere. Reopen the record.",
+      t("factUndoneElsewhere"),
+      "factUndoneElsewhere",
       {},
       values,
     );
@@ -1345,14 +1493,17 @@ export async function rollbackTargetAction(
 
   refreshTree();
 
+  const labels = stateLabel(await getTranslations("TargetLabels"));
+
   const currencyNote =
     last.valueCents !== null
-      ? ` The ${formatEuros(last.valueCents, { decimals: "never" })} take leaves the signed total.`
+      ? t("currencyNote", { amount: formatEuros(last.valueCents, { decimals: "never" }) })
       : "";
 
   return done(
     previous,
-    `${record.name} goes back to “${STATE_LABEL[revertedTo]}”. The fact was erased from the log.${currencyNote}`,
+    t("revertedTo", { name: record.name, state: labels[revertedTo], currencyNote }),
+    "revertedTo",
     result,
   );
 }
@@ -1440,12 +1591,19 @@ export async function dismissTargetAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = { id: field(formData, "id") };
   const parsed = targetSchema.safeParse({ id: field(formData, "id") });
 
   if (!parsed.success) {
-    return fail(previous, "Business not found.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("businessNotFound"),
+      "businessNotFound",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const [record] = await db
@@ -1454,10 +1612,16 @@ export async function dismissTargetAction(
     .where(and(eq(targets.ownerId, owner.id), eq(targets.id, parsed.data.id)))
     .limit(1);
 
-  if (!record) return fail(previous, "Business not found.", {}, values);
+  if (!record) return fail(previous, t("businessNotFound"), "businessNotFound", {}, values);
 
   if (record.state === "dismissed") {
-    return fail(previous, `${record.name} is already set aside.`, {}, values);
+    return fail(
+      previous,
+      t("alreadySetAside", { name: record.name }),
+      "alreadySetAside",
+      {},
+      values,
+    );
   }
 
   if (record.state === "taken") {
@@ -1465,7 +1629,8 @@ export async function dismissTargetAction(
     // anything having happened
     return fail(
       previous,
-      `${record.name} is a take: it is won and cannot be set aside.`,
+      t("takeCannotBeSetAside", { name: record.name }),
+      "takeCannotBeSetAside",
       {},
       values,
     );
@@ -1490,7 +1655,7 @@ export async function dismissTargetAction(
   };
 
   refreshTree();
-  return done(previous, `${record.name} set aside. The log stays intact.`, result);
+  return done(previous, t("setAsideLogIntact", { name: record.name }), "setAsideLogIntact", result);
 }
 
 /**
@@ -1502,12 +1667,19 @@ export async function restoreTargetAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = { id: field(formData, "id") };
   const parsed = targetSchema.safeParse({ id: field(formData, "id") });
 
   if (!parsed.success) {
-    return fail(previous, "Business not found.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("businessNotFound"),
+      "businessNotFound",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const [record] = await db
@@ -1516,10 +1688,16 @@ export async function restoreTargetAction(
     .where(and(eq(targets.ownerId, owner.id), eq(targets.id, parsed.data.id)))
     .limit(1);
 
-  if (!record) return fail(previous, "Business not found.", {}, values);
+  if (!record) return fail(previous, t("businessNotFound"), "businessNotFound", {}, values);
 
   if (record.state !== "dismissed") {
-    return fail(previous, `${record.name} is already in play.`, {}, values);
+    return fail(
+      previous,
+      t("alreadyInPlay", { name: record.name }),
+      "alreadyInPlay",
+      {},
+      values,
+    );
   }
 
   const ledger = await db
@@ -1549,9 +1727,11 @@ export async function restoreTargetAction(
   };
 
   refreshTree();
+  const labels = stateLabel(await getTranslations("TargetLabels"));
   return done(
     previous,
-    `${record.name} is back on the map, in state “${STATE_LABEL[restored]}”.`,
+    t("restoredTo", { name: record.name, state: labels[restored] }),
+    "restoredTo",
     result,
   );
 }
@@ -1570,6 +1750,7 @@ export async function renameZoneAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = {
     id: field(formData, "id"),
@@ -1582,7 +1763,13 @@ export async function renameZoneAction(
   });
 
   if (!parsed.success) {
-    return fail(previous, "Name refused.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("nameRefused"),
+      "nameRefused",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   // field() already trimmed: what is empty here really was, and is stored as
@@ -1596,7 +1783,7 @@ export async function renameZoneAction(
     .returning({ id: zones.id });
 
   if (updated.length === 0) {
-    return fail(previous, "Sector not found.", {}, values);
+    return fail(previous, t("sectorNotFound"), "sectorNotFound", {}, values);
   }
 
   const result: SectorResult = {
@@ -1609,9 +1796,8 @@ export async function renameZoneAction(
 
   return done(
     previous,
-    label === null
-      ? "Name cleared: the sector goes back to its date."
-      : `Sector renamed “${label}”.`,
+    label === null ? t("nameCleared") : t("sectorRenamed", { label }),
+    label === null ? "nameCleared" : "sectorRenamed",
     result,
   );
 }
@@ -1629,12 +1815,19 @@ export async function deleteZoneAction(
   formData: FormData,
 ): Promise<ActionState> {
   const owner = await requireUser();
+  const t = await getTranslations("ActionMessages");
 
   const values = { id: field(formData, "id") };
   const parsed = targetSchema.safeParse(values);
 
   if (!parsed.success) {
-    return fail(previous, "Sector refused.", fieldErrorsFrom(parsed.error), values);
+    return fail(
+      previous,
+      t("sectorRefused"),
+      "sectorRefused",
+      fieldErrorsFrom(parsed.error, t),
+      values,
+    );
   }
 
   const [zone] = await db
@@ -1644,7 +1837,7 @@ export async function deleteZoneAction(
     .limit(1);
 
   if (!zone) {
-    return fail(previous, "Sector not found.", {}, values);
+    return fail(previous, t("sectorNotFound"), "sectorNotFound", {}, values);
   }
 
   const targetsDeleted = await db.transaction(async (tx) => {
@@ -1672,8 +1865,9 @@ export async function deleteZoneAction(
   return done(
     previous,
     targetsDeleted > 0
-      ? `Sector deleted, along with ${plural(targetsDeleted, "business", "businesses")}.`
-      : "Sector deleted.",
+      ? t("sectorDeletedWithBusinesses", { count: targetsDeleted })
+      : t("sectorDeletedAlone"),
+    targetsDeleted > 0 ? "sectorDeletedWithBusinesses" : "sectorDeletedAlone",
     result,
   );
 }

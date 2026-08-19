@@ -1,5 +1,10 @@
 // where a displayed figure comes from. the keys are ASCII: they drive
-// `data-source` and the legend order, and are never translated.
+// `data-source` and the legend order, and are never translated. `SOURCES[key].name`
+// and `.what` stay in English at the module level — `components/map/prompt.ts`
+// reads them outside any React tree, where a translation hook cannot run.
+// Components in THIS file translate for display via `sourceName`/`sourceWhat`.
+
+import { useTranslations } from "next-intl";
 
 import { cx } from "./style";
 
@@ -64,6 +69,16 @@ export const SOURCE_ORDER: readonly SourceKey[] = [
   "log",
   "computed",
 ];
+
+type SourceT = ReturnType<typeof useTranslations<"Source">>;
+
+export function sourceName(t: SourceT, key: SourceKey): string {
+  return t(key);
+}
+
+export function sourceWhat(t: SourceT, key: SourceKey): string {
+  return t(`${key}What`);
+}
 
 // the glyphs must differ by SHAPE, not colour: the palette holds a single blue,
 // so a coloured mark would pull the eye to the provenance instead of the number.
@@ -132,21 +147,23 @@ export type SourceProps = {
 };
 
 export function Source({ sourceKey, withName = false, className }: SourceProps) {
-  const source = SOURCES[sourceKey];
+  const t = useTranslations("Source");
+  const name = sourceName(t, sourceKey);
+  const what = sourceWhat(t, sourceKey);
 
   return (
     <span
       className={cx("source", withName && "source--named", className)}
       data-source={sourceKey}
-      title={`${source.name} — ${source.what}`}
+      title={`${name} — ${what}`}
     >
       <Glyph sourceKey={sourceKey} />
       {withName ? (
-        <span className="source__name t-body-s">{source.name}</span>
+        <span className="source__name t-body-s">{name}</span>
       ) : (
         // without the visible name the glyph is mute: `title` on a `span` is
         // not reliably announced.
-        <span className="sr-only">{`Source: ${source.name}`}</span>
+        <span className="sr-only">{t("srLabel", { name })}</span>
       )}
     </span>
   );
@@ -176,6 +193,7 @@ export type SourceLegendProps = {
 };
 
 export function SourceLegend({ keys, className }: SourceLegendProps) {
+  const t = useTranslations("Source");
   const kept = SOURCE_ORDER.filter((key) => keys.includes(key));
   if (kept.length === 0) return null;
 
@@ -183,6 +201,7 @@ export function SourceLegend({ keys, className }: SourceLegendProps) {
     <ul className={cx("source-legend", className)}>
       {kept.map((key) => {
         const source = SOURCES[key];
+        const name = sourceName(t, key);
         return (
           <li key={key} className="source-legend__row">
             <Source key={key} sourceKey={key} />
@@ -190,13 +209,13 @@ export function SourceLegend({ keys, className }: SourceLegendProps) {
               <span className="t-body-s source-legend__name">
                 {source.href ? (
                   <a href={source.href} target="_blank" rel="noreferrer noopener">
-                    {source.name}
+                    {name}
                   </a>
                 ) : (
-                  source.name
+                  name
                 )}
               </span>
-              <span className="t-body-s source-legend__what">{source.what}</span>
+              <span className="t-body-s source-legend__what">{sourceWhat(t, key)}</span>
             </span>
           </li>
         );

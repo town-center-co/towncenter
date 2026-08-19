@@ -118,12 +118,57 @@ a zero.
 
 ## Interface conventions
 
-**Interface in English, amounts and dates French-formatted.** Screens,
-buttons, price reasons, error messages and the prompt template are English.
-`lib/format.ts` is pinned to `fr-FR` / `Europe/Paris` and does not move — the
-locale is frozen so server and client renders produce the same string;
-changing it reopens a hydration mismatch on every amount. The only visible
-French words are proper nouns: streets, towns, trade names.
+**Every user-facing string goes through next-intl. Never a hardcoded
+literal.** `useTranslations` (client components) or `getTranslations` (server
+components and Server Actions), one namespace per component named after its
+own exported function, added to **both** `messages/en.json` and
+`messages/fr.json` in the same commit — a JSX text node, an `aria-label`, a
+`placeholder`, a toast, a validation message, a Server Action's returned
+error: all of it. This applies to code an AI assistant writes exactly as much
+as to a human's. The locale is a stored per-account preference
+(`accountSettings.locale`, switched on `/settings`) — there is no `[locale]`
+URL segment and there must not be one; see `i18n/request.ts` for how the
+locale is resolved per request.
+
+A pure module that a non-request context also reads — `scripts/*.mts`, or
+`components/map/prompt.ts`'s Markdown export, which is deliberately English
+regardless of the UI locale (see its own header comment) — takes its
+translator as an explicit parameter (built with `createTranslator` where no
+request exists) rather than calling `useTranslations`/`getTranslations`
+itself, which requires request context and throws without it.
+
+`lib/format.ts` is pinned to `fr-FR` / `Europe/Paris` and does not move
+regardless of UI language: the locale is frozen so server and client renders
+produce the same string (changing it reopens a hydration mismatch on every
+amount), and the underlying data — French addresses, business names — does
+not change with the viewer's language preference either. The only English
+that survives untranslated on purpose is a proper noun (`Google Places`) or an
+acronym (`HTTPS`).
+
+**`lib/scoring.ts` is the one module that can never call next-intl.** It is
+read by `scripts/verify-scoring.mts` outside any Next.js request, where
+`useTranslations`/`getTranslations` would throw. Every message it produces
+(`SuccessFactor`, `PriceEstimate.reason`/`reasonKey`/`reasonParams`,
+`PriceAdjustment`, `lootReason()`) therefore carries an English `label` (used
+only by the dev scripts and `components/map/prompt.ts`'s Markdown export)
+alongside a stable ASCII `key`/`params` pair that the UI translates —
+`SuccessFactors`, `PriceReasons`, `PriceOffers` in `messages/*.json`. Follow
+this split for any new message added there; do not call next-intl from this
+file even indirectly.
+
+`lib/harvest.ts`, `lib/billing/quotas.ts` and `app/actions.ts` are different:
+every caller is a real Server Action or a Server Component read, so they call
+`getTranslations()` directly (`scripts/verify-actions.mts` runs them through
+`bench-gate`, which stubs `next/headers` with a working session, so this is
+safe there too). A module-scope constant built at import time — before any
+request exists — cannot do this; wrap it in an `async function` that calls
+`getTranslations()` on demand instead (see `quotaStartTrialMessage()` /
+`messageNoKey()`). `ActionState.messageKey` carries a stable id alongside the
+translated `message` for exactly this reason: benches assert on
+`messageKey`, never on `message` text, since `message` is real locale-
+dependent copy. A zod schema's `message:` option is set at import time too —
+it holds one of `ZOD_MESSAGE_KEY`'s ids, never real text, translated in
+`fieldErrorsFrom` once a translator exists.
 
 **Keys are ASCII, labels are visible text, and the two never mix.** A key is a
 short, lowercase, space-free string: URL value, storage key, `data-*`

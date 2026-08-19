@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { cx } from "./style";
 import { THEME_STORAGE_KEY, DEFAULT_THEME, type Theme } from "./theme";
@@ -18,6 +19,7 @@ function crossfadeColors(): void {
 // and announcement must all say what the click will do, or voice control loses
 // the "Label in Name" match.
 export function useTheme() {
+  const t = useTranslations("ThemeToggle");
   // the first client render must match the server render, so start from the
   // default and read the attribute `THEME_SCRIPT` set once mounted.
   const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
@@ -45,13 +47,12 @@ export function useTheme() {
     theme,
     toggle,
     toLight,
-    description: toLight
-      ? "Switch to the light theme"
-      : "Switch to the dark theme",
+    description: toLight ? t("toLight") : t("toDark"),
   };
 }
 
 export function ThemeToggle({ className }: { className?: string }) {
+  const t = useTranslations("ThemeToggle");
   const { toggle, toLight, description } = useTheme();
 
   return (
@@ -65,7 +66,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     >
       <ThemeIcon to={toLight ? "light" : "dark"} />
       <span className="t-label toggle__label">
-        {toLight ? "Light" : "Dark"}
+        {toLight ? t("light") : t("dark")}
       </span>
     </button>
   );

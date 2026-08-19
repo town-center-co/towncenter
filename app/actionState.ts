@@ -103,6 +103,12 @@ export type ActionResult =
 export type ActionState = {
   status: "idle" | "success" | "error";
   message: string | null;
+  /**
+   * Stable ASCII id for `message`, set alongside it. `message` is already
+   * translated (never asserted on directly) — benches assert on this instead,
+   * so a copy edit to `message` never breaks a test. Never translated itself.
+   */
+  messageKey: string | null;
   /** keyed by the control's `name` attribute. */
   fieldErrors: Record<string, string>;
   values: Record<string, string>;
@@ -115,6 +121,7 @@ export type ActionState = {
 export const initialActionState: ActionState = {
   status: "idle",
   message: null,
+  messageKey: null,
   fieldErrors: {},
   values: {},
   result: null,

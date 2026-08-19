@@ -10,6 +10,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { eq, ne, sql } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 
 import { getSession } from "@/lib/auth";
 import { db, users } from "@/lib/db";
@@ -129,18 +130,23 @@ export async function signupState(): Promise<SignupState> {
     return { open: true, isFirstAccount: false, reason: "" };
   }
 
+  const t = await getTranslations("SignupState");
   return {
     open: false,
     isFirstAccount: false,
-    reason:
-      "This instance is not accepting new accounts. Its owner can open them by " +
-      "setting ALLOW_SIGNUPS=true.",
+    reason: t("closed"),
   };
 }
 
 export type SignupResult =
   | { ok: true; account: Account }
-  | { ok: false; field: "email" | "password" | "_"; message: string };
+  // `message` is already localized (produced by `signupState()`); a plain
+  // string, not a key.
+  | { ok: false; field: "_"; message: string }
+  // `key` looks up the translated text at the UI boundary; `message` is the
+  // English fallback for non-request contexts (scripts, tests).
+  | { ok: false; field: "email"; key: "emailRequired" | "emailTaken"; message: string }
+  | { ok: false; field: "_"; key: "accountNotCreated"; message: string };
 
 // The driver error is WRAPPED: drizzle's message is the failed SQL, and the
 // constraint name only ever appears on a `cause` further down the chain. Reading
@@ -176,7 +182,12 @@ export async function createAccount(entry: {
   const email = normalizeEmail(entry.email);
 
   if (email === "") {
-    return { ok: false, field: "email", message: "Enter an email address." };
+    return {
+      ok: false,
+      field: "email",
+      key: "emailRequired",
+      message: "Enter an email address.",
+    };
   }
 
   const state = await signupState();
@@ -212,7 +223,12 @@ export async function createAccount(entry: {
       });
 
     if (!created) {
-      return { ok: false, field: "_", message: "Account not created. Try again." };
+      return {
+        ok: false,
+        field: "_",
+        key: "accountNotCreated",
+        message: "Account not created. Try again.",
+      };
     }
 
     return { ok: true, account: toAccount(created) };
@@ -222,6 +238,7 @@ export async function createAccount(entry: {
       return {
         ok: false,
         field: "email",
+        key: "emailTaken",
         message: "An account already uses this address. Sign in instead.",
       };
     }

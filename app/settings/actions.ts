@@ -5,26 +5,28 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/accounts";
 import { db, priceGrids } from "@/lib/db";
 import { checkPlacesKey } from "@/lib/sources/places";
-import { removePlacesKey, savePlacesKey } from "@/lib/settings";
+import { removePlacesKey, savePlacesKey, saveLocale } from "@/lib/settings";
+import { LOCALES, type Locale } from "@/lib/types";
 
 import { getPriceGrid } from "../queries";
 import { readGridForm } from "./form";
 import type { PlacesKeyState, PriceGridState } from "./state";
 
-const keySchema = z.object({
-  key: z
-    .string()
-    .min(20, "A Google Places key is at least 20 characters.")
-    .max(2048)
-    .refine((v) => !/\s/.test(v), {
-      message: "The key must not contain whitespace.",
-    }),
-});
+function keySchema(t: Awaited<ReturnType<typeof getTranslations<"PlacesKeyValidation">>>) {
+  return z.object({
+    key: z
+      .string()
+      .min(20, t("tooShort"))
+      .max(2048)
+      .refine((v) => !/\s/.test(v), { message: t("hasWhitespace") }),
+  });
+}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -37,13 +39,14 @@ export async function testPlacesKeyAction(
   formData: FormData,
 ): Promise<PlacesKeyState> {
   await requireUser();
+  const t = await getTranslations("PlacesKeyValidation");
 
-  const parsed = keySchema.safeParse({ key: text(formData, "key") });
+  const parsed = keySchema(t).safeParse({ key: text(formData, "key") });
   if (!parsed.success) {
     return {
       status: "error",
       message: null,
-      fieldError: parsed.error.issues[0]?.message ?? "Unreadable key.",
+      fieldError: parsed.error.issues[0]?.message ?? t("unreadable"),
     };
   }
 
@@ -51,7 +54,7 @@ export async function testPlacesKeyAction(
   if (result.ok) {
     return {
       status: "tested",
-      message: "Key accepted by Google. You can save it.",
+      message: t("accepted"),
       fieldError: null,
     };
   }
@@ -64,20 +67,21 @@ export async function savePlacesKeyAction(
   formData: FormData,
 ): Promise<PlacesKeyState> {
   const owner = await requireUser();
+  const t = await getTranslations("PlacesKeyValidation");
 
-  const parsed = keySchema.safeParse({ key: text(formData, "key") });
+  const parsed = keySchema(t).safeParse({ key: text(formData, "key") });
   if (!parsed.success) {
     return {
       status: "error",
       message: null,
-      fieldError: parsed.error.issues[0]?.message ?? "Unreadable key.",
+      fieldError: parsed.error.issues[0]?.message ?? t("unreadable"),
     };
   }
 
   await savePlacesKey(owner.id, parsed.data.key);
   revalidatePath("/settings");
 
-  return { status: "saved", message: "Key saved.", fieldError: null };
+  return { status: "saved", message: t("keySaved"), fieldError: null };
 }
 
 export async function removePlacesKeyAction(): Promise<void> {
@@ -86,13 +90,23 @@ export async function removePlacesKeyAction(): Promise<void> {
   revalidatePath("/settings");
 }
 
+export async function updateLocaleAction(locale: Locale): Promise<void> {
+  const owner = await requireUser();
+  if (!LOCALES.includes(locale)) return;
+
+  await saveLocale(owner.id, locale);
+  // the locale affects every route, not just this one
+  revalidatePath("/", "layout");
+}
+
 export async function savePriceGridAction(
   _previous: PriceGridState,
   formData: FormData,
 ): Promise<PriceGridState> {
   const owner = await requireUser();
+  const t = await getTranslations("PriceGridForm");
 
-  const { grid, fields } = readGridForm(formData, await getPriceGrid(owner));
+  const { grid, fields } = readGridForm(formData, await getPriceGrid(owner), t);
   if (grid === null) {
     return { error: null, fields, saved: false };
   }
@@ -107,7 +121,7 @@ export async function savePriceGridAction(
       });
   } catch (error) {
     console.error("[grid]", error);
-    return { error: "Grid not saved. Try again.", fields: {}, saved: false };
+    return { error: t("saveFailed"), fields: {}, saved: false };
   }
 
   revalidatePath("/");
@@ -133,7 +147,8 @@ export async function resetPriceGridAction(
     await db.delete(priceGrids).where(eq(priceGrids.ownerId, owner.id));
   } catch (error) {
     console.error("[grid:reset]", error);
-    return { error: "Grid not reset. Try again.", fields: {}, saved: false };
+    const t = await getTranslations("ResetGrid");
+    return { error: t("resetFailed"), fields: {}, saved: false };
   }
 
   revalidatePath("/");

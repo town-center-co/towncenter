@@ -158,11 +158,22 @@ file even indirectly.
 
 `lib/harvest.ts`, `lib/billing/quotas.ts` and `app/actions.ts` are different:
 every caller is a real Server Action or a Server Component read, so they call
-`getTranslations()` directly (`scripts/verify-actions.mts` runs them through
-`bench-gate`, which stubs `next/headers` with a working session, so this is
-safe there too). A module-scope constant built at import time — before any
-request exists — cannot do this; wrap it in an `async function` that calls
-`getTranslations()` on demand instead (see `quotaStartTrialMessage()` /
+`getTranslations()` directly. That call needs two things neither `tsx` nor
+plain `node` provide on their own: a session to read the locale from, and a
+resolvable `next-intl/config` — the latter is normally a webpack/turbopack
+`resolve.alias` that `next.config.ts`'s plugin sets up to point at
+`i18n/request.ts`, which exists ONLY inside `next build`/`next dev`; outside
+it, `next-intl/config` resolves to a package-internal placeholder that always
+throws `Couldn't find next-intl config file`, regardless of session state.
+`scripts/bench-gate-hooks.mjs` supplies both for `scripts/verify-actions.mts`
+and `scripts/verify-tenancy.mts`: it stubs `next/headers` with a working
+session (as before) AND aliases `next-intl/config` straight to the real
+`i18n/request.ts`, reproducing the webpack alias by hand. Skipping either
+half breaks every bench that calls `getTranslations()` transitively —
+including `app/queries.ts`'s `listFront()`, unrelated to these three files.
+A module-scope constant built at import time — before any request exists —
+cannot call `getTranslations()` either way; wrap it in an `async function`
+that calls it on demand instead (see `quotaStartTrialMessage()` /
 `messageNoKey()`). `ActionState.messageKey` carries a stable id alongside the
 translated `message` for exactly this reason: benches assert on
 `messageKey`, never on `message` text, since `message` is real locale-

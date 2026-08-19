@@ -136,9 +136,12 @@ language — changing it reopens a hydration mismatch on every amount, and the
 underlying data does not change with the viewer's language anyway. Keys are
 short, lowercase, ASCII and space-free; labels are visible text; the two
 never mix, and a renamed key orphans every row already written.
-`lib/scoring.ts`, `lib/harvest.ts` and `app/actions.ts` are a known,
-tracked exception (see `ARCHITECTURE.md`) — don't extend it in unrelated
-files. Details in
+`lib/scoring.ts` is the one exception: it is read by `scripts/verify-scoring.mts`
+outside any Next.js request, where next-intl cannot be called, so it returns a
+stable key/params pair instead of translated text, for the UI to translate.
+`lib/harvest.ts`, `lib/billing/quotas.ts` and `app/actions.ts` always run in a
+real request and call `getTranslations()` directly like everything else.
+Details in
 [`ARCHITECTURE.md`](ARCHITECTURE.md#interface-conventions).
 
 ---

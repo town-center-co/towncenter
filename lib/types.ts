@@ -203,7 +203,11 @@ export type PriceEstimate = {
 };
 
 export type SuccessFactor = {
+  /** English, used by the dev scripts and the "copy as prompt" export. */
   label: string;
+  /** Stable id for the UI to translate through `SuccessFactors` messages. */
+  key: string;
+  params?: Record<string, string | number>;
   value: number;
 };
 

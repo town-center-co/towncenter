@@ -116,6 +116,7 @@ export function TargetSheet({
   const tSheet = useTranslations("TargetSheet");
   const tFacts = useTranslations("Facts");
   const tDifficulty = useTranslations("Difficulty");
+  const tFactor = useTranslations("SuccessFactors");
 
   const [advanceState, advance, advancePending] = useActionState(
     advanceTargetAction,
@@ -1068,7 +1069,12 @@ export function TargetSheet({
                             : "neutral"
                     }
                   >
-                    <span className="t-body">{factor.label}</span>
+                    <span className="t-body">
+                      {tFactor(
+                        factor.key as Parameters<typeof tFactor>[0],
+                        factor.params as Parameters<typeof tFactor>[1],
+                      )}
+                    </span>
                     <span className="t-body tnum sheet__factor-value">
                       {index === 0
                         ? formatNumber(factor.value, 3)

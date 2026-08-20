@@ -135,6 +135,53 @@ never a public issue.
 Any Node 22 host with Postgres. `npm start` runs migrations before booting and
 exits on failure.
 
+### Docker
+
+Every tagged release publishes a prebuilt image to GHCR — no `npm install`,
+no build step on the host. This grabs two small config files (not the
+source — nothing is built locally) and starts the app with Postgres bundled:
+
+```bash
+mkdir towncenter && cd towncenter
+curl -O https://raw.githubusercontent.com/town-center-co/towncenter/main/docker-compose.prod.yml.example
+curl -O https://raw.githubusercontent.com/town-center-co/towncenter/main/.env.example
+mv docker-compose.prod.yml.example docker-compose.yml
+mv .env.example .env
+```
+
+Edit `.env` (not `.env.local` — that one's only for local `npm run dev`) and
+set `AUTH_SECRET` (`openssl rand -base64 48`) and `GOOGLE_PLACES_API_KEY`.
+Leave `DATABASE_URL` alone; `docker-compose.yml` points it at the bundled
+database for you. Then:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+**To update later**, run that last line again — same command, no separate
+migration step.
+
+<details>
+<summary>Already running your own Postgres? Skip the compose file.</summary>
+
+```bash
+docker run -d --name towncenter --restart unless-stopped -p 3000:3000 \
+  -e DATABASE_URL=postgres://user:pass@your-postgres-host:5432/towncenter \
+  -e AUTH_SECRET=$(openssl rand -base64 48) \
+  -e GOOGLE_PLACES_API_KEY=your-key \
+  ghcr.io/town-center-co/towncenter:latest
+```
+
+If that Postgres doesn't use TLS (true of most self-hosted instances), add
+`?sslmode=disable` to `DATABASE_URL` or the connection fails.
+
+To update: `docker pull ghcr.io/town-center-co/towncenter:latest`, then
+`docker stop towncenter && docker rm towncenter` before running the command
+above again — plain `docker run` won't replace a running container on its
+own the way Compose does.
+
+</details>
+
 ---
 
 ## Licence

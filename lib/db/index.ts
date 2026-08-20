@@ -18,6 +18,17 @@ function baseUrl(): string {
   return "postgres://towncenter:towncenter@localhost:5455/towncenter";
 }
 
+// `sslmode=disable` is the explicit opt-out for a same-network container the
+// operator already controls (the Docker Compose stack's own `db` service has
+// TLS off by default) — without it, every non-localhost host is assumed to be
+// a managed provider that terminates TLS. Kept in sync with the identical
+// check in scripts/migrate.mjs.
+function sslOption(url: string): false | "require" {
+  if (url.includes("localhost")) return false;
+  if (/[?&]sslmode=disable\b/.test(url)) return false;
+  return "require";
+}
+
 // THE CONNECTION MUST STAY LAZY: `next build` imports this module, so a module-level
 // pool opens connections against production on every deploy and never returns them.
 
@@ -36,7 +47,7 @@ function open(): Connection {
     // `prepared statement "s1" does not exist`.
     prepare: false,
     // `require` encrypts without demanding an authority many managed hosts lack.
-    ssl: baseUrl().includes("localhost") ? false : "require",
+    ssl: sslOption(baseUrl()),
     onnotice: () => {},
   });
 

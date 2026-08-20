@@ -17,11 +17,20 @@ if (!url) {
 
 const start = Date.now();
 
+// `sslmode=disable` is the explicit opt-out for a same-network container the
+// operator already controls (the Docker Compose stack's own `db` service has
+// TLS off by default) — kept in sync with lib/db/index.ts's identical check.
+function sslOption(value) {
+  if (value.includes("localhost")) return false;
+  if (/[?&]sslmode=disable\b/.test(value)) return false;
+  return "require";
+}
+
 // `max: 1` keeps the migration an ordered sequence. the client is closed
 // explicitly or the process stays alive and never reaches `next start`.
 const client = postgres(url, {
   max: 1,
-  ssl: url.includes("localhost") ? false : "require",
+  ssl: sslOption(url),
   onnotice: () => {},
 });
 

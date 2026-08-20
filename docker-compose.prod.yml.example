@@ -1,0 +1,57 @@
+# =============================================================================
+# Towncenter — self-hosted production stack.
+#
+# Copy this file to `docker-compose.yml` next to your `.env` (start from
+# `.env.example`), then:
+#
+#   docker compose pull && docker compose up -d
+#
+# Updating to a new release is the same two commands — no `git pull`, no
+# `npm install`. `app` runs `scripts/migrate.mjs` before it starts serving
+# (see `npm start` in package.json), so the database schema self-updates on
+# every restart; there is nothing else to run by hand.
+#
+# This is a STARTING POINT, not a hardened deployment: put a reverse proxy
+# with TLS in front of `app`, and take your own backups of the `towncenter-
+# pgdata` volume — this file does neither.
+# =============================================================================
+
+services:
+  app:
+    image: ghcr.io/town-center-co/towncenter:latest
+    container_name: towncenter-app
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever DATABASE_URL is set to in .env: inside this
+      # compose network the database is reachable as `db`, not `localhost`.
+      # `sslmode=disable` is required here — the app defaults to requiring TLS
+      # for any non-localhost host (managed Postgres providers expect it), but
+      # the `db` service below has TLS off, being a container on a private
+      # network you already control.
+      DATABASE_URL: postgres://towncenter:towncenter@db:5432/towncenter?sslmode=disable
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: towncenter-pg
+    environment:
+      POSTGRES_USER: towncenter
+      POSTGRES_PASSWORD: towncenter
+      POSTGRES_DB: towncenter
+    volumes:
+      - towncenter-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U towncenter -d towncenter"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  towncenter-pgdata:

@@ -105,8 +105,28 @@
   position: relative;
   z-index: 1;
   width: min(660px, 100%);
+  isolation: isolate;
   animation: screenEnter 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
   transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+}
+
+.screen::before {
+  position: absolute;
+  z-index: -1;
+  inset: -32px -40px;
+  border: 1px solid color-mix(in srgb, var(--border-1) 78%, transparent);
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--glass-light) 86%, transparent),
+    0 30px 80px -52px color-mix(in srgb, var(--accent) 55%, transparent);
+  content: "";
+  backdrop-filter: blur(18px) saturate(82%);
+  pointer-events: none;
+}
+
+.screen[data-screen="paywall"]::before {
+  display: none;
 }
 
 .screen[data-wide] {
@@ -975,6 +995,7 @@
   .brandMark { height: 36px; }
   .stage { place-items: start center; padding-top: 26px; }
   .screen h1, .question h1 { font-size: clamp(32px, 10vw, 45px); }
+  .screen::before { inset: -20px -10px; border-radius: 22px; }
   .promiseRow { display: grid; justify-content: start; width: max-content; margin-inline: auto; text-align: left; }
   .choiceGrid { grid-template-columns: 1fr; }
   .questionChoices > .choice:last-child:nth-child(odd) { grid-column: auto; }

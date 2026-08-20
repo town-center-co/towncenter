@@ -443,6 +443,7 @@ export function FitFunnel(props: FitFunnelProps) {
           key={`${screen}-${questionKey}`}
           className={styles.screen}
           data-leaving={leaving ? "" : undefined}
+          data-screen={screen}
           data-wide={wideScreen ? "" : undefined}
         >
           {screen !== "intro" && screen !== "analysis" && screen !== "result" ? (

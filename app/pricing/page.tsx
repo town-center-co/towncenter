@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
-// The grid editor moved to /settings, alongside the rest of the account's
-// configuration. Kept as a redirect so old links and bookmarks still land
-// somewhere useful.
-export default function PricingPage() {
-  redirect("/settings");
+export default async function PricingPage(props: PageProps<"/pricing">) {
+  const params = await props.searchParams;
+  const from = Array.isArray(params.from) ? params.from[0] : params.from;
+  redirect(from === "onboarding" ? "/settings?from=onboarding" : "/settings");
 }

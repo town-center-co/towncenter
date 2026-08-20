@@ -493,6 +493,8 @@ export type OnboardingFacts = {
   placesKeySource: PlacesKeySource;
   placesKeyMask: string | null;
   hasCustomGrid: boolean;
+  /** True once a trial or subscription runs; "Choose a plan" is then done. */
+  planChosen: boolean;
   sectorCount: number;
   isSaaS: boolean;
 };
@@ -518,10 +520,11 @@ export async function getOnboardingFacts(
     .where(eq(users.id, owner.id))
     .limit(1);
 
-  const [key, hasCustomGrid, sectorCount] = await Promise.all([
+  const [key, hasCustomGrid, sectorCount, billing] = await Promise.all([
     getAccountPlacesKey(owner.id),
     hasCustomPriceGrid(owner),
     countZones(owner),
+    getBillingState(owner.id),
   ]);
 
   return {
@@ -529,6 +532,7 @@ export async function getOnboardingFacts(
     placesKeySource: key ? "account" : envPlacesKey() ? "env" : null,
     placesKeyMask: key ? maskKey(key) : null,
     hasCustomGrid,
+    planChosen: billing.state === "trial" || billing.state === "active",
     sectorCount,
     isSaaS: process.env.NEXT_PUBLIC_SAAS === "true",
   };

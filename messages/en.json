@@ -7,6 +7,7 @@
   "SettingsPage": {
     "title": "Settings",
     "backToMap": "Back to the map",
+    "backToOnboarding": "Back to onboarding",
     "grid": "Deal value grid"
   },
   "ApiKeySection": {
@@ -133,6 +134,7 @@
     "title": "Set up your territory",
     "subtitleSaas": "Two things to do before the map becomes useful, and a plan to pick. Each step is backed by a measured fact — skip any and come back to it.",
     "subtitleSelfHosted": "Three things to do before the map becomes useful. Each one is backed by a measured fact — skip any step and come back to it.",
+    "paymentConfirmed": "Payment confirmed — your free trial is running. Nothing is charged until it ends, and you can cancel anytime from the Billing screen.",
     "stepConnectPlaces": "Connect Google Places",
     "stepReviewGrid": "Review your price grid",
     "stepChoosePlan": "Choose a plan",
@@ -156,7 +158,8 @@
     "limitZoneArea": "{count} km² per zone",
     "billingNotice": "Billing is handled by Mollie. Cancel any time — your data is yours to export.",
     "startTrial": "Start the free trial",
-    "decideLater": "I’ll decide later →",
+    "planRunning": "Your trial or subscription is running — surveying is unlocked. Manage or cancel it anytime on the Billing screen.",
+    "manageSubscription": "Manage the subscription",
     "sectorTitle": "First sector",
     "sectorBody": "Draw a sector on the map. It fills with every business actually registered there — the French national company register knows them, and it is free and key-less. Each one becomes a target carrying two numbers: the loot and the resistance.",
     "sectorSurveyed": "You have already surveyed {count, plural, one {# sector} other {# sectors}}.",
@@ -164,6 +167,7 @@
   },
   "BillingPage": {
     "title": "Billing",
+    "backToOnboarding": "Back to onboarding",
     "noticeCheckoutError": "The checkout could not be created. Try again, or come back later.",
     "noticeCancelError": "The cancellation did not go through. Try again, or come back later.",
     "noticeTermsError": "Confirm the professional-use terms before starting the trial.",
@@ -197,6 +201,17 @@
     "cancelSubscription": "Cancel the subscription",
     "cardRequiredNotice": "A card is required to start the trial — €0.00 today, and the first payment only once the trial ends. ",
     "paymentsNotice": "Payments are handled by Mollie. Cancel any time — access stays open until the end of the paid period and your existing data stays readable."
+  },
+  "BillingReturn": {
+    "title": "Payment",
+    "backToMap": "Back to the map",
+    "confirmingTitle": "Confirming your payment",
+    "confirmingBody": "Mollie is confirming the checkout — this usually takes a few seconds. Nothing to do here: the app opens by itself the moment the confirmation lands.",
+    "cardRegisteredTitle": "Card registered",
+    "cardRegisteredBody": "Your card is registered and the first charge is on its way — Mollie confirms it on its own schedule, usually within minutes. Access opens automatically then; the Billing screen shows where it stands.",
+    "openBilling": "Open the Billing screen",
+    "noConfirmationTitle": "No confirmation yet",
+    "noConfirmationBody": "The payment has not been confirmed so far. If you completed the checkout, the confirmation may simply be late — the Billing screen will show it. If you canceled it, nothing was charged and you can start again from there."
   },
   "Account": {
     "signOut": "Sign out",
@@ -805,7 +820,8 @@
     "settingsAndAccountAria": "Settings and account",
     "activityCodes": "Activity codes",
     "settingsLink": "Settings",
-    "billingLink": "Billing",
+    "billingLink": "Billing and subscription",
+    "surveyingLockedAria": "Surveying locked — start on the Billing screen",
     "cancelDrawingAria": "Cancel the drawing (Esc)",
     "drawSectorAria": "Draw a sector",
     "closeSidePanelAria": "Close the side panel",
@@ -818,6 +834,15 @@
     "enriching": "Enriching…",
     "enrichThisFrame": "Enrich this frame",
     "enrichExplainer": "Google first, then the in-house site audit. Enrichment needs a Google Places key — add one in Settings, or set GOOGLE_PLACES_API_KEY. Google is the only source of a website address, and the audit has nothing to read without one. It advances nobody — it only adds facts.",
+    "surveyingLocked": "Surveying locked",
+    "surveyingExpired": "Your trial or subscription has ended. Everything already surveyed stays readable — subscribe to keep going.",
+    "surveyingTrial": "Surveying opens with the free {days}-day trial. A card is required, nothing is charged today, and cancelling before the end costs nothing.",
+    "subscribe": "Subscribe",
+    "startFreeTrial": "Start the free trial",
+    "notNow": "Not now",
+    "paymentConfirmed": "Payment confirmed",
+    "paymentConfirmedBody": "Your trial or subscription is running — the map is fully unlocked. Manage or cancel it anytime from the menu, under “Billing and subscription”.",
+    "gotIt": "Got it",
     "surveyRunning": "Survey running",
     "survey": "Survey",
     "pageOfEstimated": "Page {page} of ~{estimated}",

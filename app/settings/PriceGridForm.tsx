@@ -42,9 +42,15 @@ export type StepWitness = { who: string; facts: ScoringFacts };
 export function PriceGridForm({
   grid,
   witnesses,
+  hasSavedGrid,
+  leaveTo,
+  leaveLabel,
 }: {
   grid: PriceGrid;
   witnesses: Record<string, StepWitness>;
+  hasSavedGrid: boolean;
+  leaveTo: Route;
+  leaveLabel: string;
 }) {
   const t = useTranslations("PriceGridForm");
   const FIELDS: EditedField[] = FIELD_KEYS.map((key) => ({
@@ -82,9 +88,9 @@ export function PriceGridForm({
 
   useEffect(() => {
     if (!finishing) return;
-    const timer = setTimeout(() => router.push("/" as Route), LEAVE_AFTER_MS);
+    const timer = setTimeout(() => router.push(leaveTo), LEAVE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [finishing, router]);
+  }, [finishing, router, leaveTo]);
 
   useEffect(() => {
     if (!carryFocus.current) return;
@@ -117,7 +123,7 @@ export function PriceGridForm({
       return;
     }
 
-    if (dirty) formRef.current?.requestSubmit();
+    if (dirty || !hasSavedGrid) formRef.current?.requestSubmit();
     setFinishing(true);
   };
 
@@ -237,11 +243,12 @@ export function PriceGridForm({
           ) : null}
 
           <div className="pricing__actions">
+            {/* Saving the unchanged default records onboarding's explicit choice. */}
             <Button
               type="submit"
               variant="primary"
               className="pricing__save"
-              disabled={inProgress || (hydrated && !dirty)}
+              disabled={inProgress || (hydrated && !dirty && hasSavedGrid)}
             >
               {inProgress ? t("saving") : t("save")}
             </Button>
@@ -289,9 +296,9 @@ export function PriceGridForm({
                     variant="primary"
                     size="compact"
                     autoFocus
-                    onClick={() => router.push("/" as Route)}
+                    onClick={() => router.push(leaveTo)}
                   >
-                    {t("backToMap")}
+                    {leaveLabel}
                   </Button>
                   <Button
                     type="button"

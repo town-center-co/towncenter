@@ -49,9 +49,7 @@ function Button({
   ...props
 }: ButtonProps) {
   const Comp = asChild ? Slot.Root : "button";
-  // `Slot.Root` clones its props onto a single child (`React.Children.only`);
-  // a spinner sibling would break that composition, so the icon only appears
-  // on a plain `<button>`.
+  // Slot.Root accepts exactly one child, so asChild cannot render a spinner sibling.
   const spinner = loading && !asChild ? <Loader2 className="button__spinner" aria-hidden="true" /> : null;
 
   return (
@@ -70,8 +68,12 @@ function Button({
       )}
       {...props}
     >
-      {spinner}
-      {children}
+      {asChild ? children : (
+        <>
+          {spinner}
+          {children}
+        </>
+      )}
     </Comp>
   );
 }

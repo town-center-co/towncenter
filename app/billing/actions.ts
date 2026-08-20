@@ -19,10 +19,12 @@ import {
 import { PRO_PLAN } from "@/lib/billing/plans";
 import {
   ensureMollieCustomer,
+  getBillingState,
   getSubscriptionRow,
   markSubscriptionCanceled,
   markSubscriptionPending,
   mollieWebhookUrl,
+  type BillingStateKind,
 } from "@/lib/billing/subscriptions";
 import { sendEmail } from "@/lib/email/resend";
 import { subscriptionCanceledEmail } from "@/lib/email/templates";
@@ -33,8 +35,11 @@ import { subscriptionCanceledEmail } from "@/lib/email/templates";
 // an account whose trial is already consumed.
 export async function subscribeAction(formData: FormData): Promise<void> {
   const owner = await requireUser();
+  // Keep billing errors inside onboarding when checkout starts there.
+  const fromOnboarding = formData.get("from") === "onboarding";
+  const fromSuffix = fromOnboarding ? "&from=onboarding" : "";
   if (formData.get("terms") !== "accepted") {
-    redirect("/billing?error=terms");
+    redirect(`/billing?error=terms${fromSuffix}` as Route);
   }
   if (!mollieEnabled()) redirect("/billing");
 
@@ -44,12 +49,15 @@ export async function subscribeAction(formData: FormData): Promise<void> {
     const appUrl = process.env.APP_URL?.trim();
     if (!appUrl) throw new MollieError("APP_URL is not set.", 0);
 
+    // The return page absorbs the browser/webhook race before choosing its destination.
+    const returnUrl = new URL("/billing/return", appUrl);
+
     const payment = await createFirstPayment({
       customerId,
       ownerId: owner.id,
       amountCents: 0,
       description: `Towncenter ${PRO_PLAN.name} — card setup`,
-      redirectUrl: new URL("/billing", appUrl).toString(),
+      redirectUrl: returnUrl.toString(),
       webhookUrl: mollieWebhookUrl(),
       methods: ZERO_AMOUNT_METHODS,
     });
@@ -61,11 +69,18 @@ export async function subscribeAction(formData: FormData): Promise<void> {
       "[billing] checkout failed:",
       error instanceof Error ? error.message : error,
     );
-    redirect("/billing?error=checkout");
+    redirect(`/billing?error=checkout${fromSuffix}` as Route);
   }
 
   // External URL: typed routes only know the app's own paths.
   redirect(checkoutUrl as Route);
+}
+
+/** Read by the /billing/return poller while the Mollie webhook is in flight. */
+export async function billingStateAction(): Promise<BillingStateKind> {
+  const owner = await requireUser();
+  const billing = await getBillingState(owner.id);
+  return billing.state;
 }
 
 export async function cancelSubscriptionAction(): Promise<void> {

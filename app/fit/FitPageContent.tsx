@@ -1,7 +1,9 @@
 import { NextIntlClientProvider } from "next-intl";
+import { redirect } from "next/navigation";
 
 import { MAX_ZONE_AREA_KM2 } from "@/lib/limits";
 import { PRO_PLAN } from "@/lib/billing/plans";
+import { getUser } from "@/lib/accounts";
 import enMessages from "@/messages/en.json";
 
 import { FitFunnel } from "./FitFunnel";
@@ -11,7 +13,9 @@ const fitMessages = {
   ThemeToggle: enMessages.ThemeToggle,
 };
 
-export function FitPageContent({ initialStep }: { initialStep?: string }) {
+export async function FitPageContent({ initialStep }: { initialStep?: string }) {
+  if (await getUser()) redirect("/");
+
   return (
     <NextIntlClientProvider locale="en" messages={fitMessages}>
       <FitFunnel

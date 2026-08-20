@@ -5,6 +5,8 @@ import enMessages from "@/messages/en.json";
 
 import { FitPageContent } from "../FitPageContent";
 
+export const dynamic = "force-dynamic";
+
 const STEPS = [
   "stage",
   "service",

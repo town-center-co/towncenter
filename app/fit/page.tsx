@@ -4,6 +4,8 @@ import enMessages from "@/messages/en.json";
 
 import { FitPageContent } from "./FitPageContent";
 
+export const dynamic = "force-dynamic";
+
 export function generateMetadata(): Metadata {
   return {
     title: enMessages.FitFunnel.metadataTitle,

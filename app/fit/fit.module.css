@@ -74,6 +74,20 @@
   padding: 36px 20px 48px;
 }
 
+.stage::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 76% 86% at center,
+    var(--paper) 0%,
+    color-mix(in srgb, var(--paper) 96%, transparent) 58%,
+    transparent 100%
+  );
+  content: "";
+  pointer-events: none;
+}
+
 @keyframes screenEnter {
   from {
     opacity: 0;
@@ -89,6 +103,7 @@
 
 .screen {
   position: relative;
+  z-index: 1;
   width: min(660px, 100%);
   animation: screenEnter 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
   transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;

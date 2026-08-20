@@ -831,11 +831,14 @@
   position: relative;
   z-index: 4;
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 24px;
   padding: 18px clamp(20px, 4vw, 64px) 24px;
   color: var(--text-2);
   font-size: 11px;
+  text-align: center;
 }
 
 .footer a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
@@ -944,8 +947,6 @@
   .priceBadge { grid-template-columns: auto auto; justify-content: center; gap: 8px; min-height: 76px; }
   .priceBadge small { align-self: end; padding-bottom: 5px; }
   .paywall { border-radius: 20px; }
-  .footer { align-items: flex-end; }
-  .footer > span { max-width: 180px; }
 }
 
 @media (max-width: 420px) {

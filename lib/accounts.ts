@@ -13,9 +13,9 @@ import { eq, ne, sql } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { getSession } from "@/lib/auth";
-import { db, users } from "@/lib/db";
+import { accountSettings, db, users } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import type { UserRole } from "@/lib/types";
+import type { Locale, UserRole } from "@/lib/types";
 
 // `passwordHash` is deliberately absent: this shape crosses server components,
 // where one `JSON.stringify` in a prop would send the hash to the browser.
@@ -118,7 +118,7 @@ export type SignupState = {
   reason: string; // visible text, empty when open
 };
 
-export async function signupState(): Promise<SignupState> {
+export async function signupState(locale?: Locale): Promise<SignupState> {
   const isFirstAccount = await isFreshInstance();
 
   // the very first account always passes, or the instance stays unusable.
@@ -130,7 +130,9 @@ export async function signupState(): Promise<SignupState> {
     return { open: true, isFirstAccount: false, reason: "" };
   }
 
-  const t = await getTranslations("SignupState");
+  const t = locale
+    ? await getTranslations({ locale, namespace: "SignupState" })
+    : await getTranslations("SignupState");
   return {
     open: false,
     isFirstAccount: false,
@@ -178,6 +180,7 @@ export async function createAccount(entry: {
   email: string;
   password: string;
   displayName?: string | null;
+  locale?: Locale;
 }): Promise<SignupResult> {
   const email = normalizeEmail(entry.email);
 
@@ -190,7 +193,7 @@ export async function createAccount(entry: {
     };
   }
 
-  const state = await signupState();
+  const state = await signupState(entry.locale);
   if (!state.open) {
     return { ok: false, field: "_", message: state.reason };
   }
@@ -204,23 +207,35 @@ export async function createAccount(entry: {
   const role: UserRole = state.isFirstAccount ? "owner" : "member";
 
   try {
-    const [created] = await db
-      .insert(users)
-      .values({
-        email,
-        passwordHash: hash,
-        displayName,
-        role,
-        createdAt: now,
-        updatedAt: now,
-        lastSeenAt: now,
-      })
-      .returning({
-        id: users.id,
-        email: users.email,
-        displayName: users.displayName,
-        role: users.role,
-      });
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(users)
+        .values({
+          email,
+          passwordHash: hash,
+          displayName,
+          role,
+          createdAt: now,
+          updatedAt: now,
+          lastSeenAt: now,
+        })
+        .returning({
+          id: users.id,
+          email: users.email,
+          displayName: users.displayName,
+          role: users.role,
+        });
+
+      if (row && entry.locale) {
+        await tx.insert(accountSettings).values({
+          ownerId: row.id,
+          locale: entry.locale,
+          updatedAt: now,
+        });
+      }
+
+      return row;
+    });
 
     if (!created) {
       return {

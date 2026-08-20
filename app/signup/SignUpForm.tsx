@@ -16,6 +16,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui";
+import type { Locale } from "@/lib/types";
 
 import { signUpAction } from "../login/actions";
 import { INITIAL_SIGNUP_STATE } from "../login/state";
@@ -27,9 +28,10 @@ export type SignUpProps = {
   isFirstAccount: boolean;
   next: string | null;
   fromFit: boolean;
+  locale: Locale;
 };
 
-export function SignUp({ isFirstAccount, next, fromFit }: SignUpProps) {
+export function SignUp({ isFirstAccount, next, fromFit, locale }: SignUpProps) {
   const t = useTranslations("SignUp");
   const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
@@ -48,6 +50,7 @@ export function SignUp({ isFirstAccount, next, fromFit }: SignUpProps) {
     // (data-dashlane-rid and similar) before React hydrates.
     <form action={action} noValidate suppressHydrationWarning>
       {next ? <input type="hidden" name="next" value={next} /> : null}
+      <input type="hidden" name="locale" value={locale} />
       {state.error ? (
         <p className={styles.alert} role="alert">
           {state.error}

@@ -53,8 +53,12 @@ import {
 import { areaKm2 } from "@/lib/geo";
 import { openZone } from "@/lib/harvest";
 import { createFirstPayment } from "@/lib/billing/mollie";
+import { PRO_PLAN } from "@/lib/billing/plans";
 import { applyMolliePayment } from "@/lib/billing/subscriptions";
-import { MAX_CUMULATIVE_AREA_KM2 } from "@/lib/limits";
+import {
+  MAX_CUMULATIVE_AREA_KM2,
+  MAX_TARGETS_PER_HARVEST,
+} from "@/lib/limits";
 import { resetPassword } from "@/lib/passwordReset";
 import { DEFAULT_PRICE_GRID } from "@/lib/priceGrid";
 import { isPlacesConfigured } from "@/lib/sources/places";
@@ -295,6 +299,11 @@ async function main() {
     "the bench runs with NO Google key",
     !isPlacesConfigured(),
     "no request can be billed",
+  );
+  check(
+    "one dense sector can use the advertised monthly allowance",
+    MAX_TARGETS_PER_HARVEST === PRO_PLAN.limits.harvestedTargets,
+    `${MAX_TARGETS_PER_HARVEST} businesses`,
   );
 
   // Concurrent zone requests must serialize the quota read and insertion.

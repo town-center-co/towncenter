@@ -15,13 +15,14 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui";
+import type { Locale } from "@/lib/types";
 
 import { signInAction } from "./actions";
 import { INITIAL_SIGNIN_STATE } from "./state";
 
 import styles from "@/components/gate/gate.module.css";
 
-export function SignIn() {
+export function SignIn({ locale }: { locale: Locale }) {
   const t = useTranslations("SignIn");
   const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
@@ -96,6 +97,7 @@ export function SignIn() {
 
       {/* Return path. Its safety is checked SERVER-side, never here. */}
       <input type="hidden" name="next" value={next} />
+      <input type="hidden" name="locale" value={locale} />
 
       <div style={{ marginTop: "24px" }}>
         <Button type="submit" variant="primary" fullWidth disabled={inProgress}>

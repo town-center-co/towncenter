@@ -60,22 +60,20 @@ The session identifies a user account. Every exported read receives that
 account first, and every owned query filters by `owner_id`.
 `scripts/verify-tenancy.mts` is the executable isolation contract.
 
-## Billing and trial
+## Billing
 
-There is one Pro plan at €10 per month with a card-backed 14-day trial.
+There is one Pro plan at €10 per month with no free trial.
 
-1. Checkout creates a Mollie customer and a €0 first payment.
-2. Mollie captures a reusable card or PayPal mandate without charging it.
-3. The payment webhook opens the trial and schedules the subscription for the
-   trial end date.
-4. Mollie performs the first €10 charge after 14 days and sends its payment
-   webhook.
-5. A daily job sends the required reminder three days before the first charge.
+1. Checkout creates a Mollie customer and charges €10 for the first month.
+2. Mollie captures the reusable card or PayPal mandate with that payment.
+3. The payment webhook opens the paid period and creates the monthly
+   subscription for later renewals.
+4. Renewal payment webhooks advance the paid period each month.
 
-Canceling during the trial prevents the first charge and keeps access until the
-trial ends. Canceling a paid subscription keeps access through the paid period.
-A consumed trial is never granted again. Existing data stays readable after
-expiry; costly surveying actions stop.
+Canceling keeps access through the paid period. Existing data stays readable
+after expiry; costly surveying actions stop. Legacy trial columns and states
+remain readable until every account created under the retired trial has
+drained.
 
 ## Monthly quotas
 
@@ -87,16 +85,17 @@ expiry; costly surveying actions stop.
 | Total area surveyed | 50 km² | Sum of zone bounding-box areas |
 | Area per zone | 12 km² | Geometry guard before insertion |
 
-Counts start at the current trial or paid-period boundary. The cumulative-area
+Counts start at the current paid-period boundary, or the legacy trial boundary
+for an account that still has one. The cumulative-area
 check and zone insertion run in one transaction under an account-scoped
 Postgres advisory lock, so concurrent requests cannot cross the limit.
 
 ## Email
 
-Resend sends welcome, password-reset, trial-started, trial-reminder,
-subscription-activated, suspended, and canceled messages. Password-reset tokens
-are SHA-256 hashes, expire after 30 minutes, are single-use, and are limited to
-three requests per hour per account.
+Resend sends welcome, password-reset, subscription-activated, suspended, and
+canceled messages. Legacy trial reminders remain until old trials drain.
+Password-reset tokens are SHA-256 hashes, expire after 30 minutes, are
+single-use, and are limited to three requests per hour per account.
 
 Without `RESEND_API_KEY` and `EMAIL_FROM`, messages are logged instead of sent.
 Email failure never fails signup, password reset, or a Mollie webhook.
@@ -109,7 +108,7 @@ Email failure never fails signup, password reset, or a Mollie webhook.
 | `AUTH_SECRET` | Session signing and account API-key encryption secret |
 | `APP_URL` | Canonical hosted origin and callback base |
 | `NEXT_PUBLIC_SAAS=true` | SaaS onboarding and permanently open signup |
-| `MOLLIE_API_KEY` | Billing, trial, and quota enforcement |
+| `MOLLIE_API_KEY` | Billing and quota enforcement |
 | `GOOGLE_PLACES_API_KEY` | Platform enrichment key |
 | `RESEND_API_KEY` | Transactional email provider |
 | `EMAIL_FROM` | Verified sender identity |
@@ -119,13 +118,13 @@ Email failure never fails signup, password reset, or a Mollie webhook.
 
 The application service runs `npm start`, which applies committed Drizzle
 migrations before starting Next.js. Mollie calls `/api/mollie/webhook`. A
-separate daily Railway job runs `npm run trial:reminder`.
+The legacy trial-reminder job can be removed once no trial rows remain.
 
 Before opening traffic, verify:
 
 - `npm run lint`, `npm run typecheck`, `npm run verify`, and `npm run build`;
-- signup, onboarding, mandate capture, trial start, reminder, first charge,
-  cancellation, expiry, and re-subscription against Mollie test mode;
+- signup, onboarding, first charge, mandate capture, renewal, cancellation,
+  expiry, and re-subscription against Mollie test mode;
 - welcome and password-reset delivery from the verified Resend domain;
 - database backup and restore, application health checks, and error alerts;
 - account data-access and deletion requests through the published contact channel;

@@ -1065,19 +1065,27 @@ export async function listFront(owner: Account, limit = 5): Promise<FrontLine[]>
     return b.target.score.expectancyCents - a.target.score.expectancyCents;
   });
 
-  const kept = ranked.slice(0, places);
+  const seenCompanies = new Set<string>();
+  const uniqueRanked = ranked.filter((row) => {
+    if (seenCompanies.has(row.target.siren)) return false;
+    seenCompanies.add(row.target.siren);
+    return true;
+  });
+
+  const kept = uniqueRanked.slice(0, places);
 
   // expectancyCents is ZERO on an off-grid target by construction, so the sort
   // always puts them last while they are often the dearest deals in the file.
-  // One seat, never more, ranked among themselves by establishment count.
+  // One seat, never more; the smallest off-grid business is the more approachable visit.
   const isOffGrid = (row: (typeof ranked)[number]): boolean =>
     row.target.score.price.kind === "off-grid";
 
   if (places >= 2 && !kept.some(isOffGrid)) {
-    const bestOffGrid = [...ranked].filter(isOffGrid).sort((a, b) => {
+    const bestOffGrid = [...uniqueRanked].filter(isOffGrid).sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
       const establishments =
-        (b.target.establishmentCount ?? 0) - (a.target.establishmentCount ?? 0);
+        (a.target.establishmentCount ?? Number.MAX_SAFE_INTEGER) -
+        (b.target.establishmentCount ?? Number.MAX_SAFE_INTEGER);
       if (establishments !== 0) return establishments;
       return a.target.name.localeCompare(b.target.name, "fr");
     })[0];

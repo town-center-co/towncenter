@@ -13,6 +13,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { ThemeToggle } from "@/components/ui";
+import type { Locale } from "@/lib/types";
 
 import { WorldMap } from "./WorldMap";
 import townCentre from "./towncenter.png";
@@ -28,10 +29,14 @@ export type GateProps = {
   children: React.ReactNode;
   /** The footer: the switch to the other screen. */
   toggle?: React.ReactNode;
+  /** Signed-out funnel locale, before an account preference exists. */
+  locale?: Locale;
 };
 
-export async function Gate({ title, subtitle, children, toggle }: GateProps) {
-  const t = await getTranslations("Gate");
+export async function Gate({ title, subtitle, children, toggle, locale }: GateProps) {
+  const t = locale
+    ? await getTranslations({ locale, namespace: "Gate" })
+    : await getTranslations("Gate");
 
   return (
     <main className={styles.frame}>

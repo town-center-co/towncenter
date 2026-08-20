@@ -89,6 +89,11 @@ In the target sheet header the percentage is also the button that opens the
 factor-by-factor breakdown in the **Facts** tab — never put the calculation
 out of reach of the number that came from it.
 
+**The hosted business allowance and the dense-sector ceiling are one
+number:** `MAX_TARGETS_PER_HARVEST`. `PRO_PLAN` imports it rather than copying
+it, and the Server Action also applies the account's remaining allowance to
+each slice so the last page cannot overshoot the advertised monthly limit.
+
 ---
 
 ## Scoring
@@ -114,6 +119,11 @@ reason is written out in full. Those are often the best deals in the file —
 never sink them to the bottom of a sort, never replace the written reason with
 a zero.
 
+**The daily front represents companies, not establishments.** It shows at
+most one target per SIREN. One place remains available to an off-grid company;
+at equal commercial urgency, the company with the smaller establishment count
+wins that place because it is the more approachable local prospect.
+
 ---
 
 ## Interface conventions
@@ -129,6 +139,12 @@ as to a human's. The locale is a stored per-account preference
 (`accountSettings.locale`, switched on `/settings`) — there is no `[locale]`
 URL segment and there must not be one; see `i18n/request.ts` for how the
 locale is resolved per request.
+
+The public `/fit` funnel is deliberately English. Its signup and sign-in links
+carry `locale=en`; those signed-out pages use an explicit provider, and a new
+account stores that locale in the same transaction as the user row. Losing any
+one of those three steps produces an English funnel that switches language at
+the account form or immediately after account creation.
 
 A pure module read from outside React — `components/map/facts.ts`, feeding
 `components/map/prompt.ts`'s Markdown export, which is deliberately English

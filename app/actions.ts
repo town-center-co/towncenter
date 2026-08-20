@@ -46,7 +46,7 @@ import {
 import { checkQuota } from "@/lib/billing/quotas";
 import { formatEuros } from "@/lib/format";
 import { normalizeBbox } from "@/lib/geo";
-import { ENRICH_BATCH_SIZE } from "@/lib/limits";
+import { ENRICH_BATCH_SIZE, MAX_TARGETS_PER_HARVEST } from "@/lib/limits";
 import { harvestSlice, openZone, resumeZone } from "@/lib/harvest";
 import { purgeStaleGoogleFacts } from "@/lib/retention";
 import { auditSite } from "@/lib/sources/audit";
@@ -497,6 +497,12 @@ export async function harvestZoneAction(
     nafCodes,
     startPage: input.page ?? 1,
     alreadyFound,
+    maxTargets: Number.isFinite(harvestQuota.limit)
+      ? Math.min(
+          MAX_TARGETS_PER_HARVEST,
+          alreadyFound + Math.max(0, harvestQuota.limit - harvestQuota.used),
+        )
+      : MAX_TARGETS_PER_HARVEST,
   });
 
   const result: SurveyResult = {

@@ -23,6 +23,7 @@ import { sendEmail } from "@/lib/email/resend";
 import { welcomeEmail } from "@/lib/email/templates";
 import { internalPath } from "@/lib/internal-route";
 import { PASSWORD_MAX, PASSWORD_MIN, checkPasswordShape } from "@/lib/password";
+import { LOCALES, type Locale } from "@/lib/types";
 
 // a "use server" module may export only async functions, so the state types
 // live next door in state.ts
@@ -77,7 +78,11 @@ export async function signInAction(
   _previous: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
-  const t = await getTranslations();
+  const localeRaw = field(formData, "locale");
+  const locale = (LOCALES as readonly string[]).includes(localeRaw)
+    ? (localeRaw as Locale)
+    : undefined;
+  const t = locale ? await getTranslations({ locale }) : await getTranslations();
   const email = field(formData, "email");
 
   const parsed = signInSchema(t).safeParse({
@@ -131,7 +136,11 @@ export async function signUpAction(
   _previous: SignupFormState,
   formData: FormData,
 ): Promise<SignupFormState> {
-  const t = await getTranslations();
+  const localeRaw = field(formData, "locale");
+  const locale = (LOCALES as readonly string[]).includes(localeRaw)
+    ? (localeRaw as Locale)
+    : undefined;
+  const t = locale ? await getTranslations({ locale }) : await getTranslations();
   const email = field(formData, "email");
   const displayName = field(formData, "displayName");
   const base = { email, displayName, error: null, fields: {} };
@@ -155,7 +164,7 @@ export async function signUpAction(
   // The gate is re-checked here, not only on the page: a Server Action is a
   // directly reachable HTTP endpoint whose id is readable in the client bundle,
   // so hiding the form when sign-ups are closed closes nothing.
-  const state = await signupState();
+  const state = await signupState(locale);
   if (!state.open) {
     return { ...base, error: state.reason };
   }
@@ -180,6 +189,7 @@ export async function signUpAction(
       email: parsed.data.email,
       password: parsed.data.password,
       displayName: parsed.data.displayName ?? null,
+      locale,
     });
   } catch (error) {
     console.error("[signup]", error);

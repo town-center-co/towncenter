@@ -135,7 +135,11 @@ function stepsFor(facts: OnboardingFacts, t: T): StepMeta[] {
     items.push({ key: "key", label: t("stepConnectPlaces"), done: facts.placesKeySource !== null });
   }
   if (facts.isSaaS) {
-    items.push({ key: "upgrade", label: t("stepChoosePlan"), done: facts.planChosen });
+    items.push({
+      key: "upgrade",
+      label: facts.planChosen ? t("stepPlanActive") : t("stepChoosePlan"),
+      done: facts.planChosen,
+    });
   }
   items.push({ key: "grid", label: t("stepReviewGrid"), done: facts.hasCustomGrid });
   items.push({ key: "sector", label: t("stepSurveySector"), done: facts.sectorCount > 0 });

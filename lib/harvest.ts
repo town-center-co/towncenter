@@ -322,6 +322,8 @@ export type HarvestSliceRequest = {
   maxPages?: number;
   /** Targets already written for this sector, so the cap bites. */
   alreadyFound?: number;
+  /** Sector total allowed after applying the account's remaining quota. */
+  maxTargets?: number;
 };
 
 /** Serializable: never an `Error`. */
@@ -384,6 +386,10 @@ export async function harvestSlice(
     HARVEST_PAGES_PER_CALL,
     Math.max(1, request.maxPages ?? HARVEST_PAGES_PER_CALL),
   );
+  const maxTargets = Math.min(
+    MAX_TARGETS_PER_HARVEST,
+    Math.max(0, request.maxTargets ?? MAX_TARGETS_PER_HARVEST),
+  );
 
   const tally = createTally();
   const seenSirets = new Set<string>();
@@ -414,7 +420,7 @@ export async function harvestSlice(
       break;
     }
 
-    if (zoneTotal >= MAX_TARGETS_PER_HARVEST) {
+    if (zoneTotal >= maxTargets) {
       truncated = true;
       done = true;
       break;
@@ -465,8 +471,8 @@ export async function harvestSlice(
       outsidePolygon += before - batch.length;
     }
 
-    if (zoneTotal + batch.length > MAX_TARGETS_PER_HARVEST) {
-      batch = batch.slice(0, Math.max(0, MAX_TARGETS_PER_HARVEST - zoneTotal));
+    if (zoneTotal + batch.length > maxTargets) {
+      batch = batch.slice(0, Math.max(0, maxTargets - zoneTotal));
       truncated = true;
     }
 
@@ -522,7 +528,7 @@ export async function harvestSlice(
     zoneNew = row?.targetsNew ?? created;
   }
 
-  if (zoneFound >= MAX_TARGETS_PER_HARVEST) {
+  if (zoneFound >= maxTargets) {
     truncated = true;
     done = true;
   }

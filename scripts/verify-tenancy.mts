@@ -270,11 +270,25 @@ async function main() {
   // stay at one.
   const aliceInPlay = await seedInPlay(alice, "12345678900022");
   const bobInPlay = await seedInPlay(bob, "12345678900022");
+  const [aliceDuplicate] = await db
+    .insert(targets)
+    .values({
+      ownerId: alice.id,
+      siret: "12345678900033",
+      siren: "123456789",
+      name: "Florist duplicate establishment",
+      lat: 47.2,
+      lng: 1.2,
+      establishmentCount: 1,
+      state: "studied",
+    })
+    .returning({ id: targets.id });
 
   const aliceFront = await listFront(alice);
   check(
-    "listFront offers its own target still in play",
-    aliceFront.length === 1 && aliceFront[0]?.target.id === aliceInPlay,
+    "listFront offers one line per legal company",
+    aliceFront.length === 1 &&
+      [aliceInPlay, aliceDuplicate?.id].includes(aliceFront[0]?.target.id),
     `${aliceFront.length} line`,
   );
   check(
@@ -282,6 +296,54 @@ async function main() {
     aliceFront.every(
       (row) => row.target.id !== atBob.targetId && row.target.id !== bobInPlay,
     ),
+  );
+
+  const frontOwner = await createOwner("front");
+  const localTargets = Array.from({ length: 5 }, (_, index) => {
+    const siren = String(920_000_001 + index);
+    return {
+      ownerId: frontOwner.id,
+      siret: `${siren}00001`,
+      siren,
+      name: `Independent ${index + 1}`,
+      lat: 47.3 + index / 1_000,
+      lng: 1.3,
+      establishmentCount: 1,
+      state: "spotted" as const,
+    };
+  });
+  const smallChainSiren = "930000001";
+  const largeChainSiren = "930000002";
+  await db.insert(targets).values([
+    ...localTargets,
+    {
+      ownerId: frontOwner.id,
+      siret: `${smallChainSiren}00001`,
+      siren: smallChainSiren,
+      name: "Small regional chain",
+      lat: 47.4,
+      lng: 1.4,
+      establishmentCount: 6,
+      state: "spotted",
+    },
+    {
+      ownerId: frontOwner.id,
+      siret: `${largeChainSiren}00001`,
+      siren: largeChainSiren,
+      name: "National chain",
+      lat: 47.5,
+      lng: 1.5,
+      establishmentCount: 121,
+      state: "spotted",
+    },
+  ]);
+
+  const approachableFront = await listFront(frontOwner);
+  check(
+    "the off-grid seat favors an approachable regional business",
+    approachableFront.some((row) => row.target.siren === smallChainSiren) &&
+      approachableFront.every((row) => row.target.siren !== largeChainSiren),
+    approachableFront.map((row) => row.target.name).join(" · "),
   );
 
   // A fresh account sees NOTHING, not even a falsely zeroed total.
@@ -523,6 +585,7 @@ async function main() {
   const signup = await createAccount({
     email: SIGNUP_EMAIL,
     password: SIGNUP_PASSWORD,
+    locale: "en",
   });
 
   check(
@@ -531,6 +594,19 @@ async function main() {
       (await verifyCredentials(SIGNUP_EMAIL, SIGNUP_PASSWORD))?.id ===
         signup.account.id,
     signup.ok ? signup.account.id : "signup refused",
+  );
+
+  const [signupSettings] = signup.ok
+    ? await db
+        .select({ locale: accountSettings.locale })
+        .from(accountSettings)
+        .where(eq(accountSettings.ownerId, signup.account.id))
+        .limit(1)
+    : [];
+  check(
+    "signup preserves the fit funnel locale",
+    signupSettings?.locale === "en",
+    signupSettings?.locale ?? "no setting",
   );
 
   const again = await createAccount({

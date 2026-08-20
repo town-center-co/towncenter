@@ -199,8 +199,8 @@ const POST_CHOICES: Record<Branch, { goals: readonly ChoiceItem[]; rhythms: read
   },
 };
 
-const SIGNUP_ROUTE = "/signup?from=fit&next=%2Fbilling%3Ffrom%3Dfit" as Route;
-const SIGNIN_ROUTE = "/login?from=fit&next=%2Fbilling%3Ffrom%3Dfit" as Route;
+const SIGNUP_ROUTE = "/signup?from=fit&locale=en&next=%2Fbilling%3Ffrom%3Dfit" as Route;
+const SIGNIN_ROUTE = "/login?from=fit&locale=en&next=%2Fbilling%3Ffrom%3Dfit" as Route;
 const STORAGE_KEY = "towncenter:fit-funnel:v1";
 const QUESTION_ROUTES: Record<PreQuestionKey, string> = {
   stage: "stage",

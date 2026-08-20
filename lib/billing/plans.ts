@@ -2,7 +2,10 @@
 // levers, and a price change applies to everyone. Kept out of any "use server"
 // module so client components can import the numbers.
 
-import { MAX_CUMULATIVE_AREA_KM2 } from "@/lib/limits";
+import {
+  MAX_CUMULATIVE_AREA_KM2,
+  MAX_TARGETS_PER_HARVEST,
+} from "@/lib/limits";
 
 export const PRO_PLAN = {
   id: "pro",
@@ -11,7 +14,7 @@ export const PRO_PLAN = {
   /** Mollie interval syntax. */
   interval: "1 month",
   limits: {
-    harvestedTargets: 2_500,
+    harvestedTargets: MAX_TARGETS_PER_HARVEST,
     enrichments: 300,
     siteAudits: 100,
     cumulativeAreaKm2: MAX_CUMULATIVE_AREA_KM2,

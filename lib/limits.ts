@@ -11,7 +11,8 @@ export const MAX_CUMULATIVE_AREA_KM2 = 50;
 
 export const HARVEST_PAGES_PER_CALL = 25;
 
-export const MAX_TARGETS_PER_HARVEST = 1_500;
+// One dense sector may consume the full hosted monthly allowance, but never exceed it.
+export const MAX_TARGETS_PER_HARVEST = 2_500;
 
 export const ENRICH_BATCH_SIZE = 12;
 

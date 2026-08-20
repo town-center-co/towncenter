@@ -1193,7 +1193,7 @@ export type BillingFacts = {
   status: SubscriptionStatus | "none";
   /** Paid through now — `canceled` stays current until the period runs out. */
   current: boolean;
-  /** Non-null once a mandate opened a trial; the account gets exactly one. */
+  /** Non-null only for accounts that used the retired hosted trial. */
   trialEndsAtIso: string | null;
   periodEndIso: string | null;
   usedKm2: number;

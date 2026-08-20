@@ -11,7 +11,6 @@ import type { Route } from "next";
 import { requireUser } from "@/lib/accounts";
 import {
   MollieError,
-  ZERO_AMOUNT_METHODS,
   cancelSubscriptionAtMollie,
   createFirstPayment,
   mollieEnabled,
@@ -29,19 +28,30 @@ import {
 import { sendEmail } from "@/lib/email/resend";
 import { subscriptionCanceledEmail } from "@/lib/email/templates";
 
-// One action for the trial and for every later re-subscription: the checkout
-// is always a €0.00 mandate capture, and the WEBHOOK decides what it opens —
-// a 14-day trial for a first-timer, an immediately-charging subscription for
-// an account whose trial is already consumed.
+// The first recurring-sequence payment is also the first paid month.
 export async function subscribeAction(formData: FormData): Promise<void> {
   const owner = await requireUser();
   // Keep billing errors inside onboarding when checkout starts there.
-  const fromOnboarding = formData.get("from") === "onboarding";
-  const fromSuffix = fromOnboarding ? "&from=onboarding" : "";
+  const source = formData.get("from");
+  const fromSuffix =
+    source === "onboarding" || source === "fit" ? `&from=${source}` : "";
   if (formData.get("terms") !== "accepted") {
     redirect(`/billing?error=terms${fromSuffix}` as Route);
   }
   if (!mollieEnabled()) redirect("/billing");
+  const checkoutToken = formData.get("checkoutToken");
+  if (
+    typeof checkoutToken !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      checkoutToken,
+    )
+  ) {
+    redirect(`/billing?error=checkout${fromSuffix}` as Route);
+  }
+  const billing = await getBillingState(owner.id);
+  if (billing.state === "trial" || billing.state === "active") {
+    redirect("/billing");
+  }
 
   let checkoutUrl: string;
   try {
@@ -49,17 +59,16 @@ export async function subscribeAction(formData: FormData): Promise<void> {
     const appUrl = process.env.APP_URL?.trim();
     if (!appUrl) throw new MollieError("APP_URL is not set.", 0);
 
-    // The return page absorbs the browser/webhook race before choosing its destination.
     const returnUrl = new URL("/billing/return", appUrl);
 
     const payment = await createFirstPayment({
       customerId,
       ownerId: owner.id,
-      amountCents: 0,
-      description: `Towncenter ${PRO_PLAN.name} — card setup`,
+      amountCents: PRO_PLAN.priceCents,
+      description: `Towncenter ${PRO_PLAN.name} — first month`,
       redirectUrl: returnUrl.toString(),
       webhookUrl: mollieWebhookUrl(),
-      methods: ZERO_AMOUNT_METHODS,
+      idempotencyKey: `towncenter-first-${owner.id}-${checkoutToken}`,
     });
 
     await markSubscriptionPending(owner.id);

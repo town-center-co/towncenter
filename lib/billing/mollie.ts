@@ -83,6 +83,7 @@ export type MolliePayment = {
     | "expired"
     | "failed";
   paidAt?: string;
+  amount?: { currency: string; value: string };
   customerId?: string;
   sequenceType: "oneoff" | "first" | "recurring";
   subscriptionId?: string;
@@ -113,10 +114,6 @@ export async function createCustomer(input: {
   });
 }
 
-// The only methods Mollie accepts for a €0.00 first payment; anything else
-// needs at least €0.01 and would show a charge on a "free" trial signup.
-export const ZERO_AMOUNT_METHODS = ["creditcard", "paypal"] as const;
-
 export async function createFirstPayment(input: {
   customerId: string;
   ownerId: string;
@@ -124,7 +121,8 @@ export async function createFirstPayment(input: {
   description: string;
   redirectUrl: string;
   webhookUrl: string;
-  /** Restrict the hosted checkout, e.g. to ZERO_AMOUNT_METHODS at €0.00. */
+  idempotencyKey: string;
+  /** Restrict the payment methods offered by Mollie. */
   methods?: readonly string[];
 }): Promise<{ id: string; checkoutUrl: string }> {
   const payment = await mollie<MolliePayment>("/payments", {
@@ -139,6 +137,7 @@ export async function createFirstPayment(input: {
       metadata: { ownerId: input.ownerId },
       ...(input.methods ? { method: [...input.methods] } : {}),
     },
+    idempotencyKey: input.idempotencyKey,
   });
 
   const checkoutUrl = payment._links?.checkout?.href;
@@ -158,7 +157,7 @@ export async function createSubscription(input: {
   priceCents: number;
   interval: string;
   description: string;
-  /** `YYYY-MM-DD`; Mollie makes the first real charge on this date. */
+  /** `YYYY-MM-DD`; Mollie makes the next recurring charge on this date. */
   startDate: string;
   webhookUrl: string;
   mandatePaymentId: string;

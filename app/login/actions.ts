@@ -1,6 +1,5 @@
 "use server";
 
-import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
@@ -20,9 +19,9 @@ import {
   verifyCredentials,
 } from "@/lib/accounts";
 import { mollieEnabled } from "@/lib/billing/mollie";
-import { TRIAL_DAYS } from "@/lib/billing/plans";
 import { sendEmail } from "@/lib/email/resend";
 import { welcomeEmail } from "@/lib/email/templates";
+import { internalPath } from "@/lib/internal-route";
 import { PASSWORD_MAX, PASSWORD_MIN, checkPasswordShape } from "@/lib/password";
 
 // a "use server" module may export only async functions, so the state types
@@ -57,35 +56,8 @@ function signUpSchema(t: Awaited<ReturnType<typeof getTranslations>>) {
       .string()
       .max(120, t("AuthActions.displayNameTooLong", { max: 120 }))
       .optional(),
+    next: z.string().max(2048).optional(),
   });
-}
-
-/**
- * Backslash or control character: forbidden in a return path. Written as code
- * points rather than a character class, because a regex containing real control
- * bytes is invisible on review.
- */
-function hasDangerousChar(value: string): boolean {
-  for (const char of value) {
-    const code = char.codePointAt(0) ?? 0;
-    if (code === 0x5c || code < 0x20 || code === 0x7f) return true;
-  }
-  return false;
-}
-
-/**
- * Accepts only an internal path: blocks open redirects.
- *
- * "starts with / but not //" is not enough: the browser normalises backslashes
- * to slashes and strips control characters BEFORE resolving the URL, so
- * `"/\\evil.com"` resolves to `https://evil.com/`. Those characters are refused
- * outright.
- */
-function internalPath(value: string | undefined): Route {
-  if (!value) return "/";
-  if (hasDangerousChar(value)) return "/";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-  return value as Route;
 }
 
 function field(form: FormData, name: string): string {
@@ -168,6 +140,7 @@ export async function signUpAction(
     email,
     password: rawPassword(formData),
     displayName: displayName || undefined,
+    next: field(formData, "next") || undefined,
   });
 
   if (!parsed.success) {
@@ -227,13 +200,13 @@ export async function signUpAction(
       account.email,
       welcomeEmail({
         name: account.displayName,
-        trialDays: mollieEnabled() ? TRIAL_DAYS : null,
+        hosted: mollieEnabled(),
       }),
     ),
   );
 
   await createSession(result.account.id);
-  redirect("/onboarding");
+  redirect(internalPath(parsed.data.next, "/onboarding"));
 }
 
 export async function signOutAction(): Promise<void> {

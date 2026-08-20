@@ -59,7 +59,6 @@ import {
 } from "@/components/ui";
 import { AccountMenu } from "@/components/gate/Account";
 import type { Account } from "@/lib/accounts";
-import { TRIAL_DAYS } from "@/lib/billing/plans";
 import { formatEuros } from "@/lib/format";
 import { areaKm2, normalizeBbox } from "@/lib/geo";
 import {
@@ -1952,14 +1951,12 @@ export function TerritoryMap({
               <p className="t-body">
                 {billingGate === "expired"
                   ? t("surveyingExpired")
-                  : t("surveyingTrial", { days: TRIAL_DAYS })}
+                  : t("surveyingSubscribe")}
               </p>
               <div className="map__work-actions">
                 <Button variant="primary" size="compact" asChild>
                   <Link href={"/billing" as Route}>
-                    {billingGate === "expired"
-                      ? t("subscribe")
-                      : t("startFreeTrial")}
+                    {t("subscribe")}
                   </Link>
                 </Button>
                 <Button

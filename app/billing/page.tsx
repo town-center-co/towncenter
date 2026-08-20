@@ -4,13 +4,14 @@ import type { Route } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { requireUser } from "@/lib/accounts";
-import { PRO_PLAN, TRIAL_DAYS } from "@/lib/billing/plans";
+import { PRO_PLAN } from "@/lib/billing/plans";
 import { MAX_ZONE_AREA_KM2 } from "@/lib/limits";
 import { LOCALE, TIME_ZONE } from "@/lib/format";
 import { getBillingFacts, type BillingFacts } from "@/app/queries";
 import { Badge, Button, Card } from "@/components/ui";
 
 import { cancelSubscriptionAction, subscribeAction } from "./actions";
+import { SubscribeButton } from "./SubscribeButton";
 
 import styles from "./billing.module.css";
 
@@ -52,6 +53,7 @@ export default async function BillingPage(props: PageProps<"/billing">) {
   const error = first(params.error);
   const canceled = first(params.canceled);
   const fromOnboarding = first(params.from) === "onboarding";
+  const fromFit = first(params.from) === "fit";
   const notice = error
     ? NOTICES[`error:${error}`]
     : canceled
@@ -66,11 +68,13 @@ export default async function BillingPage(props: PageProps<"/billing">) {
         </Badge>
         <Link
           className={`t-body-s ${styles.back}`}
-          href={(fromOnboarding ? "/onboarding" : "/") as Route}
+          href={(fromOnboarding ? "/onboarding" : fromFit ? "/fit" : "/") as Route}
         >
           {fromOnboarding
             ? t("backToOnboarding")
-            : shared("SettingsPage.backToMap")}
+            : fromFit
+              ? t("backToFit")
+              : shared("SettingsPage.backToMap")}
         </Link>
       </header>
 
@@ -84,6 +88,7 @@ export default async function BillingPage(props: PageProps<"/billing">) {
         <SaasBilling
           facts={facts}
           fromOnboarding={fromOnboarding}
+          fromFit={fromFit}
           t={t}
           shared={shared}
         />
@@ -146,11 +151,13 @@ function statusLine(facts: BillingFacts, t: T): string {
 function SaasBilling({
   facts,
   fromOnboarding,
+  fromFit,
   t,
   shared,
 }: {
   facts: BillingFacts;
   fromOnboarding: boolean;
+  fromFit: boolean;
   t: T;
   shared: T;
 }) {
@@ -158,9 +165,7 @@ function SaasBilling({
   const canCancel =
     facts.status === "active" &&
     (facts.state === "trial" || facts.state === "active");
-  // one trial per account: once consumed, the same checkout charges right away
-  const trialAvailable = facts.trialEndsAtIso === null;
-
+  const checkoutToken = canSubscribe ? globalThis.crypto.randomUUID() : null;
   return (
     <>
       {facts.testMode ? <p className={styles.testMode}>{t("testMode")}</p> : null}
@@ -173,7 +178,7 @@ function SaasBilling({
             <span className={styles.period}>{t("perMonth")}</span>
           </span>
         </div>
-        <p className="t-body-s tone-2">{t("trialNotice", { days: TRIAL_DAYS })}</p>
+        <p className="t-body-s tone-2">{t("planNotice")}</p>
         <ul className={styles.limits}>
           <li>{shared("OnboardingPage.limitHarvested", { count: PRO_PLAN.limits.harvestedTargets.toLocaleString(LOCALE) })}</li>
           <li>{shared("OnboardingPage.limitEnrichments", { count: PRO_PLAN.limits.enrichments })}</li>
@@ -203,9 +208,14 @@ function SaasBilling({
         <div className={styles.actions}>
           {canSubscribe ? (
             <form action={subscribeAction}>
+              <input type="hidden" name="checkoutToken" value={checkoutToken ?? ""} />
               {/* Preserve the onboarding return path if checkout setup fails. */}
-              {fromOnboarding ? (
-                <input type="hidden" name="from" value="onboarding" />
+              {fromOnboarding || fromFit ? (
+                <input
+                  type="hidden"
+                  name="from"
+                  value={fromOnboarding ? "onboarding" : "fit"}
+                />
               ) : null}
               <label className={styles.acceptance}>
                 <input name="terms" type="checkbox" value="accepted" required />
@@ -219,11 +229,9 @@ function SaasBilling({
                   })}
                 </span>
               </label>
-              <Button type="submit" variant="primary">
-                {trialAvailable
-                  ? t("startTrial", { days: TRIAL_DAYS })
-                  : t("subscribe", { price: PRO_PLAN.priceCents / 100 })}
-              </Button>
+              <SubscribeButton
+                label={t("subscribe", { price: PRO_PLAN.priceCents / 100 })}
+              />
             </form>
           ) : null}
           {canCancel ? (
@@ -236,7 +244,7 @@ function SaasBilling({
         </div>
 
         <p className="t-body-s tone-3">
-          {trialAvailable && canSubscribe ? t("cardRequiredNotice") : ""}
+          {canSubscribe ? t("chargeNotice") : ""}
           {t("paymentsNotice")}
         </p>
       </Card>

@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { cx } from "./style";
-import { THEME_STORAGE_KEY, DEFAULT_THEME, type Theme } from "./theme";
+import {
+  THEME_STORAGE_KEY,
+  DEFAULT_THEME,
+  type Theme,
+  type ThemePreference,
+} from "./theme";
 
 // the keys and the anti-flash script live in `./theme`, which carries no
 // directive because `app/layout.tsx` reads them server-side.
@@ -20,17 +25,35 @@ function crossfadeColors(): void {
 // the "Label in Name" match.
 export function useTheme() {
   const t = useTranslations("ThemeToggle");
-  // the first client render must match the server render, so start from the
-  // default and read the attribute `THEME_SCRIPT` set once mounted.
   const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
 
   useEffect(() => {
-    const applied = document.documentElement.dataset.theme;
-    if (applied === "light" || applied === "dark") setTheme(applied);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const readPreference = (): ThemePreference => {
+      let stored: string | null = null;
+      try {
+        stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      } catch {
+        // Private browsing can make localStorage unavailable.
+      }
+      return stored === "light" || stored === "dark" ? stored : "system";
+    };
+    const apply = () => {
+      const preference = readPreference();
+      const next = preference === "system" ? (media.matches ? "dark" : "light") : preference;
+      document.documentElement.dataset.theme = next;
+      setTheme(next);
+    };
+
+    apply();
+    if (readPreference() !== "system") return;
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
   }, []);
 
   const toggle = useCallback(() => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
+    const current = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    const next: Theme = current === "dark" ? "light" : "dark";
     crossfadeColors();
     document.documentElement.dataset.theme = next;
     try {
@@ -39,7 +62,7 @@ export function useTheme() {
       // private browsing, storage full: the theme holds for the session.
     }
     setTheme(next);
-  }, [theme]);
+  }, []);
 
   const toLight = theme === "dark";
 
@@ -52,22 +75,16 @@ export function useTheme() {
 }
 
 export function ThemeToggle({ className }: { className?: string }) {
-  const t = useTranslations("ThemeToggle");
   const { toggle, toLight, description } = useTheme();
 
   return (
     <button
       type="button"
-      className={cx("toggle", className)}
+      className={cx("toggle", "tooltip", "tooltip--below", className)}
       onClick={toggle}
       aria-label={description}
-      // the rail hides the label while narrow: without a tooltip, a bare circle.
-      title={description}
     >
       <ThemeIcon to={toLight ? "light" : "dark"} />
-      <span className="t-label toggle__label">
-        {toLight ? t("light") : t("dark")}
-      </span>
     </button>
   );
 }

@@ -25,9 +25,11 @@ import styles from "@/components/gate/gate.module.css";
 export type SignUpProps = {
   /** True when this is the very first account on the instance. */
   isFirstAccount: boolean;
+  next: string | null;
+  fromFit: boolean;
 };
 
-export function SignUp({ isFirstAccount }: SignUpProps) {
+export function SignUp({ isFirstAccount, next, fromFit }: SignUpProps) {
   const t = useTranslations("SignUp");
   const common = useTranslations("Common");
   const [state, action, inProgress] = useActionState(
@@ -45,6 +47,7 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
     // suppressHydrationWarning: password managers tag the form itself
     // (data-dashlane-rid and similar) before React hydrates.
     <form action={action} noValidate suppressHydrationWarning>
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       {state.error ? (
         <p className={styles.alert} role="alert">
           {state.error}
@@ -74,21 +77,23 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
           <FieldError id="signup-email-error">{state.fields.email}</FieldError>
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="signup-name">{t("name")}</FieldLabel>
-          <Input
-            id="signup-name"
-            name="displayName"
-            type="text"
-            autoComplete="name"
-            maxLength={120}
-            defaultValue={state.displayName}
-            aria-invalid={state.fields.displayName ? true : undefined}
-            aria-describedby={`signup-name-hint${state.fields.displayName ? " signup-name-error" : ""}`}
-          />
-          <FieldDescription id="signup-name-hint">{t("nameHint")}</FieldDescription>
-          <FieldError id="signup-name-error">{state.fields.displayName}</FieldError>
-        </Field>
+        {!fromFit ? (
+          <Field>
+            <FieldLabel htmlFor="signup-name">{t("name")}</FieldLabel>
+            <Input
+              id="signup-name"
+              name="displayName"
+              type="text"
+              autoComplete="name"
+              maxLength={120}
+              defaultValue={state.displayName}
+              aria-invalid={state.fields.displayName ? true : undefined}
+              aria-describedby={`signup-name-hint${state.fields.displayName ? " signup-name-error" : ""}`}
+            />
+            <FieldDescription id="signup-name-hint">{t("nameHint")}</FieldDescription>
+            <FieldError id="signup-name-error">{state.fields.displayName}</FieldError>
+          </Field>
+        ) : null}
 
         <Field>
           <FieldLabel htmlFor="signup-password">{common("password")}</FieldLabel>
@@ -120,7 +125,13 @@ export function SignUp({ isFirstAccount }: SignUpProps) {
 
       <div style={{ marginTop: "24px" }}>
         <Button type="submit" variant="primary" fullWidth disabled={inProgress}>
-          {inProgress ? t("creating") : isFirstAccount ? t("claim") : t("create")}
+          {inProgress
+            ? t("creating")
+            : isFirstAccount
+              ? t("claim")
+              : fromFit
+                ? t("continueToPayment")
+                : t("create")}
         </Button>
       </div>
     </form>

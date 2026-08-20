@@ -78,10 +78,7 @@ export const viewport: Viewport = {
   // maximumScale is not set and must not be
   width: "device-width",
   initialScale: 1,
-  // The browser chrome follows the DEFAULT theme, not prefers-color-scheme: the
-  // product's theme is chosen through `data-theme`, and mirroring the system
-  // setting would put a dark strip above a paper background. This is the END
-  // colour of the surface gradient.
+  // This is the light fallback used before the system preference is resolved.
   themeColor: "#edeff2",
 };
 
@@ -93,7 +90,7 @@ export default async function RootLayout({
   const locale = await getLocale();
 
   return (
-    // `data-theme` is an ASCII key: `dark` / `light`. Light is the default.
+    // `data-theme` is an ASCII key: `dark` / `light`. Light is the server fallback.
     <html
       lang={locale}
       data-theme={DEFAULT_THEME}
@@ -104,11 +101,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Applies the saved theme BEFORE first paint. `beforeInteractive` is
-            the only strategy that runs early enough: a React effect runs
-            after, so after the flash. A plain <script> works too, but React
-            warns that it "is never executed when rendering on the client" —
-            `next/script` is what Next.js actually recommends for this. */}
+        {/* Resolves the saved or system theme BEFORE first paint. */}
         <Script
           id="theme-script"
           strategy="beforeInteractive"

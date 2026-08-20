@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   // literal `href` values are checked at compile time; a concatenated one needs
   // an `as Route` cast.
   typedRoutes: true,

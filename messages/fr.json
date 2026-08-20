@@ -33,6 +33,258 @@
     "enterEmailAddress": "Saisissez votre adresse e-mail.",
     "entryRefused": "Entrée refusée."
   },
+  "FitFunnel": {
+    "metadataTitle": "Towncenter est-il fait pour vous ?",
+    "metadataDescription": "Un parcours de deux minutes pour les freelances web débutants ou établis qui cherchent des clients locaux en France.",
+    "progress": "Question {current} sur {total}",
+    "back": "Retour",
+    "continue": "Continuer",
+    "footer": "Un outil de prospection ciblé pour la France — pas un CRM.",
+    "signIn": "Déjà client ? Se connecter",
+    "intro": {
+      "eyebrow": "Votre parcours de prospection locale",
+      "title": "Trouvez la bonne façon de commencer à chercher des clients locaux.",
+      "subtitle": "Dites-nous où vous en êtes aujourd’hui. Le parcours s’adapte aux personnes qui démarrent comme à celles qui travaillent déjà avec des clients.",
+      "time": "Environ 2 minutes",
+      "noAccount": "Aucun compte requis",
+      "priceUpfront": "10 €/mois si c’est adapté",
+      "cta": "Construire mon parcours",
+      "finePrint": "Six questions courtes avant votre résultat. Aucun compte ni paiement pour le moment."
+    },
+    "pre": {
+      "kicker": "Votre point de départ",
+      "autoAdvance": "Choisissez la réponse la plus proche. Nous passerons automatiquement à la suite.",
+      "stage": {
+        "title": "Où en êtes-vous aujourd’hui ?",
+        "subtitle": "Cette réponse adapte le parcours. Elle ne change ni le prix ni les fonctionnalités.",
+        "options": {
+          "preparing": { "label": "Je me prépare à démarrer", "detail": "Je construis mon offre et me prépare à chercher des clients." },
+          "firstClients": { "label": "J’ai commencé, mais il me faut des clients", "detail": "Je cherche mon premier flux régulier de projets." },
+          "established": { "label": "Je travaille déjà avec des clients", "detail": "Je veux une meilleure façon de trouver les suivants." }
+        }
+      },
+      "service": {
+        "title": "Que vendez-vous, ou souhaitez-vous vendre ?",
+        "subtitle": "Choisissez le service pour lequel vous voulez être identifié par les entreprises locales.",
+        "options": {
+          "websites": { "label": "Des sites web neufs", "detail": "Concevoir le premier ou le prochain site d’une entreprise." },
+          "redesigns": { "label": "Des refontes de sites", "detail": "Remplacer les sites datés, confus ou inefficaces." },
+          "maintenance": { "label": "Maintenance et services récurrents", "detail": "Mises à jour, entretien et travail web continu." },
+          "broader": { "label": "Des services numériques plus larges", "detail": "Les sites web font partie d’une offre plus étendue." },
+          "undecided": { "label": "Je n’ai pas encore décidé", "detail": "Je précise encore ce que je souhaite vendre." }
+        }
+      },
+      "audience": {
+        "title": "Avec qui souhaitez-vous travailler ?",
+        "subtitle": "Towncenter se concentre volontairement sur les petites structures locales.",
+        "options": {
+          "shops": { "label": "Commerces et restaurants", "detail": "Des lieux indépendants au service de leur quartier." },
+          "professionals": { "label": "Professionnels locaux", "detail": "Cabinets, consultants et entreprises de services." },
+          "trades": { "label": "Artisans", "detail": "Artisanat, bâtiment et services à domicile." },
+          "companies": { "label": "Petites entreprises", "detail": "Des entreprises indépendantes avec une présence locale." },
+          "exploring": { "label": "J’explore encore", "detail": "Je n’ai pas encore choisi un type de client précis." }
+        }
+      },
+      "location": {
+        "title": "Où souhaitez-vous trouver des clients ?",
+        "subtitle": "La découverte automatique d’entreprises utilise aujourd’hui les données publiques françaises.",
+        "options": {
+          "france": { "label": "Principalement en France", "detail": "Mon premier ou prochain territoire sera en France." },
+          "mixed": { "label": "En France et ailleurs", "detail": "Les entreprises locales françaises font partie de mon marché." },
+          "outside": { "label": "En dehors de la France", "detail": "Je ne prévois pas de prospecter des entreprises françaises." }
+        }
+      },
+      "startingReadiness": {
+        "title": "Si une entreprise disait oui demain, pourriez-vous livrer ?",
+        "subtitle": "Un outil de prospection n’est utile que si vous pouvez réaliser le travail qu’il vous aide à trouver.",
+        "options": {
+          "independent": { "label": "Oui, en autonomie", "detail": "Je peux cadrer et livrer le service moi-même." },
+          "support": { "label": "Oui, avec un modèle ou du soutien", "detail": "Je peux livrer avec un cadre que je maîtrise déjà." },
+          "practice": { "label": "Il me faut encore de la pratique", "detail": "J’apprends avant d’accepter un vrai projet." },
+          "unclear": { "label": "Je ne sais pas encore quoi proposer", "detail": "Mon service n’est pas encore assez concret pour être vendu." }
+        }
+      },
+      "startingBlocker": {
+        "title": "Qu’est-ce qui vous empêche de prospecter aujourd’hui ?",
+        "subtitle": "Votre réponse servira à définir le premier jalon du plan.",
+        "options": {
+          "prospects": { "label": "Je ne sais pas qui contacter", "detail": "Trouver des entreprises adaptées est le plus difficile." },
+          "message": { "label": "Je ne sais pas quoi dire", "detail": "Il me faut une raison plus claire d’ouvrir la conversation." },
+          "pricing": { "label": "Je doute de mes prix", "detail": "Je dois relier mon offre à une valeur réaliste." },
+          "confidence": { "label": "Je manque de confiance", "detail": "Il me faut une première étape plus petite et concrète." },
+          "routine": { "label": "Je n’ai pas de routine", "detail": "La prospection ne trouve jamais sa place dans ma semaine." }
+        }
+      },
+      "establishedSource": {
+        "title": "D’où viennent vos clients aujourd’hui ?",
+        "subtitle": "Cette réponse indique ce que Towncenter devrait compléter ou remplacer.",
+        "options": {
+          "referrals": { "label": "Surtout des recommandations", "detail": "De bons projets arrivent, mais pas à un rythme prévisible." },
+          "inbound": { "label": "Des demandes entrantes", "detail": "Les prospects me trouvent et me contactent généralement." },
+          "maps": { "label": "Des cartes et annuaires", "detail": "Je cherche déjà des entreprises locales en ligne." },
+          "manual": { "label": "De la recherche manuelle", "detail": "Je constitue mes listes entreprise par entreprise." },
+          "mixed": { "label": "Un mélange de sources", "detail": "Aucun canal ne fournit à lui seul tout le pipeline." }
+        }
+      },
+      "establishedBottleneck": {
+        "title": "Qu’est-ce qui demande le plus d’effort dans votre prospection ?",
+        "subtitle": "Choisissez la contrainte que vous retireriez en premier.",
+        "options": {
+          "enough": { "label": "Trouver assez d’entreprises", "detail": "Le haut de la liste de prospects est trop court." },
+          "quality": { "label": "Savoir qui mérite d’être contacté", "detail": "Trop de recherche mène à des occasions faibles." },
+          "start": { "label": "Savoir par où commencer", "detail": "Chaque session démarre devant une page blanche." },
+          "data": { "label": "Rassembler les bonnes informations", "detail": "Les faits utiles sont dispersés à plusieurs endroits." },
+          "consistency": { "label": "Rester régulier", "detail": "La prospection disparaît quand les projets clients s’accumulent." }
+        }
+      }
+    },
+    "analysis": {
+      "kicker": "Vérification de l’adéquation",
+      "title": "Comparaison de vos réponses avec le périmètre de Towncenter",
+      "starting": {
+        "market": "Marché : entreprises locales couvertes par les données publiques françaises",
+        "offer": "Préparation : un service que vous pouvez livrer à un vrai client",
+        "motion": "Point de départ : un obstacle concret à traiter"
+      },
+      "established": {
+        "market": "Marché : entreprises locales couvertes par les données publiques françaises",
+        "offer": "Offre : services numériques vendus au projet",
+        "motion": "Méthode : un processus de prospection que Towncenter peut améliorer"
+      }
+    },
+    "result": {
+      "starting": {
+        "seal": "Prêt à prospecter",
+        "kicker": "Votre parcours de départ",
+        "title": "Vous êtes prêt à construire votre première routine de prospection locale.",
+        "subtitle": "Vous pouvez livrer un travail utile et vous avez un marché local français à explorer. Towncenter peut remplacer la page blanche par un territoire concret et des prochaines actions.",
+        "criteria": { "one": "Un service que vous pouvez livrer", "two": "Un marché local accessible", "three": "Un premier obstacle clair" },
+        "cta": "Construire mon plan de départ"
+      },
+      "established": {
+        "seal": "Profil adapté",
+        "kicker": "Votre parcours de développement",
+        "title": "Towncenter peut rendre votre prospection locale plus sélective.",
+        "subtitle": "Votre offre et votre marché existent déjà. L’enjeu est de consacrer moins d’effort aux listes et davantage aux entreprises qui méritent une approche.",
+        "criteria": { "one": "Données d’entreprises françaises", "two": "Prospection locale sélective", "three": "Prochaines actions classées" },
+        "cta": "Construire mon plan hebdomadaire"
+      }
+    },
+    "post": {
+      "starting": {
+        "goals": {
+          "kicker": "Votre premier jalon",
+          "title": "Que souhaitez-vous accomplir en premier ?",
+          "subtitle": "Choisissez le prochain résultat qui serait concret et utile, pas la destination finale.",
+          "options": {
+            "territory": { "label": "Choisir ma première zone", "detail": "Savoir dans quel quartier commencer." },
+            "shortlist": { "label": "Construire une liste de prospects", "detail": "Transformer un territoire en entreprises à examiner." },
+            "outreach": { "label": "Contacter mes premiers prospects", "detail": "Passer de la recherche à une vraie approche." },
+            "conversation": { "label": "Obtenir mon premier échange", "detail": "Créer l’occasion de discuter d’un projet." },
+            "client": { "label": "Signer mon premier client", "detail": "Remonter depuis le premier projet payé." }
+          }
+        },
+        "rhythms": {
+          "kicker": "Votre rythme de travail",
+          "title": "Quel rythme de prospection semble réaliste ?",
+          "subtitle": "Un petit rythme répété vaut mieux qu’un plan ambitieux abandonné rapidement.",
+          "options": {
+            "daily": { "label": "15 minutes presque chaque jour", "detail": "Avancer par petites étapes avec l’apprentissage et les projets." },
+            "weekly": { "label": "Une session ciblée par semaine", "detail": "Examiner et sélectionner des entreprises dans un créneau protégé." },
+            "twice": { "label": "Deux sessions ciblées par semaine", "detail": "Séparer la recherche de l’approche et du suivi." },
+            "recommend": { "label": "Recommandez-moi un rythme", "detail": "Commencer avec une base raisonnable et l’ajuster ensuite." }
+          }
+        }
+      },
+      "established": {
+        "goals": {
+          "kicker": "Votre première amélioration",
+          "title": "Que doit améliorer Towncenter en premier ?",
+          "subtitle": "Choisissez la partie de votre processus actuel qui compte le plus.",
+          "options": {
+            "more": { "label": "Trouver plus de prospects", "detail": "Alimenter régulièrement le haut du pipeline." },
+            "better": { "label": "Identifier de meilleurs prospects", "detail": "Prioriser les occasions qui méritent votre attention." },
+            "time": { "label": "Réduire le temps de recherche", "detail": "Ne plus rassembler les mêmes faits à la main." },
+            "consistency": { "label": "Prospecter plus régulièrement", "detail": "Donner à la prospection une place répétable dans la semaine." }
+          }
+        },
+        "rhythms": {
+          "kicker": "Votre rythme hebdomadaire",
+          "title": "Combien de nouvelles entreprises souhaitez-vous examiner chaque semaine ?",
+          "subtitle": "C’est un objectif d’examen, pas la promesse de contacter chaque entreprise.",
+          "options": {
+            "five": { "label": "5 entreprises", "detail": "Une routine légère et très sélective." },
+            "ten": { "label": "10 entreprises", "detail": "Une liste hebdomadaire ciblée." },
+            "twenty": { "label": "20 entreprises", "detail": "Un rythme de prospection sortante régulier." },
+            "thirty": { "label": "Plus de 30", "detail": "Un territoire plus large et un examen plus fréquent." }
+          }
+        }
+      }
+    },
+    "plan": {
+      "starting": {
+        "kicker": "Votre plan de départ",
+        "title": "Transformez un quartier en première routine répétable.",
+        "subtitle": "Towncenter n’enseigne pas le métier et ne promet pas un client. Il donne un point de départ concret et de vraies entreprises à évaluer.",
+        "goalLabel": "Premier jalon",
+        "rhythmLabel": "Rythme de travail",
+        "steps": {
+          "one": { "title": "Définissez une offre et un prix de départ", "detail": "Utilisez un service que vous pouvez déjà livrer à une vraie entreprise." },
+          "two": { "title": "Prospectez un territoire raisonnable", "detail": "Constituez une liste réelle depuis le registre national des entreprises." },
+          "three": { "title": "Examinez une courte sélection chaque semaine", "detail": "Transformez les meilleures entreprises en prochaines actions précises." }
+        }
+      },
+      "established": {
+        "kicker": "Votre plan hebdomadaire",
+        "title": "Une routine de prospection locale plus sélective.",
+        "subtitle": "Utilisez votre offre et vos prix actuels pour décider quelles entreprises proches méritent la prochaine heure de recherche ou d’approche.",
+        "goalLabel": "Première amélioration",
+        "rhythmLabel": "Rythme hebdomadaire",
+        "steps": {
+          "one": { "title": "Calibrez votre grille de prix", "detail": "Utilisez la valeur des services que vous vendez réellement." },
+          "two": { "title": "Prospectez un territoire actif", "detail": "Remplacez les listes manuelles par les données d’entreprises françaises." },
+          "three": { "title": "Traitez les meilleures actions suivantes", "detail": "Recherchez et contactez chaque semaine une courte sélection classée." }
+        }
+      },
+      "cta": "Voir le plan et le prix"
+    },
+    "paywall": {
+      "kicker": "Un seul plan, sans essai",
+      "starting": {
+        "title": "Construisez votre première liste de prospects locaux",
+        "subtitle": "Commencez avec un territoire et une routine adaptée à votre premier jalon."
+      },
+      "established": {
+        "title": "Trouvez et priorisez vos prochains clients locaux",
+        "subtitle": "Remplacez la recherche manuelle par un territoire classé de prospects intéressants."
+      },
+      "perMonth": "par mois",
+      "harvest": "Jusqu’à {count, number} entreprises récoltées par période",
+      "enrich": "{count, number} enrichissements Google Places",
+      "audits": "{count, number} audits de site web",
+      "area": "{area, number} km² par période, jusqu’à {zone, number} km² par zone",
+      "today": "Facturé aujourd’hui",
+      "then": "Puis",
+      "monthly": "{price} €/mois",
+      "cancel": "Annulez à tout moment. L’accès reste ouvert jusqu’à la fin de la période payée.",
+      "cta": "Créer mon compte — {price} € aujourd’hui",
+      "accountNext": "La courte création de compte vient ensuite ; le paiement est sécurisé par Mollie."
+    },
+    "mismatch": {
+      "outside": {
+        "kicker": "En dehors de la couverture actuelle",
+        "title": "Towncenter ne découvre pas encore les entreprises hors de France.",
+        "subtitle": "Sa recherche automatique repose sur les données publiques françaises. Nous préférons le dire maintenant plutôt que de vendre un outil incapable de couvrir votre marché."
+      },
+      "notReady": {
+        "kicker": "Une étape avant la prospection",
+        "title": "Clarifiez l’offre avant de payer un logiciel de prospection.",
+        "subtitle": "Towncenter peut trouver et classer des entreprises, mais il ne remplace ni la pratique nécessaire pour livrer un projet ni la définition de ce que vous vendez. Revenez lorsqu’un service sera prêt pour un vrai client."
+      },
+      "restart": "Revoir mes réponses",
+      "site": "Découvrir le produit"
+    }
+  },
   "Gate": {
     "tagline": "Prospection de quartier, rue par rue."
   },
@@ -73,8 +325,10 @@
     "backToSignIn": "Retour à la connexion",
     "claimTitle": "Réclamer cette instance",
     "createTitle": "Créer votre compte",
+    "fitTitle": "Votre plan territorial est prêt",
     "claimSubtitle": "Vous êtes le premier ici. Ce compte possédera le territoire.",
     "createSubtitle": "Un compte, un territoire. Rien n’est partagé entre eux.",
+    "fitSubtitle": "Enregistrez votre plan avec un e-mail et un mot de passe. Le paiement sécurisé est l’étape suivante et finale.",
     "toggle": "Déjà un compte ? <link>Se connecter</link>"
   },
   "SignUp": {
@@ -83,7 +337,8 @@
     "nameHint": "Facultatif. Il n’apparaît que dans le menu du compte.",
     "creating": "Création…",
     "claim": "Réclamer cette instance",
-    "create": "Créer le compte"
+    "create": "Créer le compte",
+    "continueToPayment": "Continuer vers le paiement sécurisé"
   },
   "ForgotPasswordPage": {
     "title": "Verrouillé dehors ?",
@@ -132,9 +387,9 @@
   },
   "OnboardingPage": {
     "title": "Configurez votre territoire",
-    "subtitleSaas": "Deux choses à faire avant que la carte ne devienne utile, et un plan à choisir. Chaque étape s’appuie sur un fait mesuré — passez-en une et revenez-y plus tard.",
+    "subtitleSaas": "Activez votre plan, calibrez vos prix, puis prospectez un premier secteur. Chaque étape s’appuie sur un fait mesuré.",
     "subtitleSelfHosted": "Trois choses à faire avant que la carte ne devienne utile. Chacune s’appuie sur un fait mesuré — passez une étape et revenez-y plus tard.",
-    "paymentConfirmed": "Paiement confirmé — votre essai gratuit est en cours. Rien n’est facturé avant son terme, et vous pouvez l’annuler à tout moment depuis l’écran Facturation.",
+    "paymentConfirmed": "Paiement confirmé — votre premier mois payé est actif. Gérez ou annulez l’abonnement à tout moment depuis Facturation.",
     "stepConnectPlaces": "Connecter Google Places",
     "stepReviewGrid": "Vérifier votre grille de prix",
     "stepChoosePlan": "Choisir un plan",
@@ -149,7 +404,7 @@
     "openSettings": "Ouvrir les paramètres",
     "keepDefaultGrid": "Garder la grille par défaut →",
     "planTitle": "Plan",
-    "planBody": "Towncenter propose un essai gratuit de {days} jours, puis {price} €/mois — un seul plan, sans paliers. Une carte est requise pour démarrer l’essai, mais rien n’est facturé avant son terme, et annuler avant ne coûte rien.",
+    "planBody": "Towncenter coûte {price} €/mois — un seul plan, sans paliers ni essai gratuit. Le premier mois est facturé aujourd’hui, puis l’abonnement est renouvelé chaque mois.",
     "perMonth": "/mois",
     "limitHarvested": "{count} entreprises récoltées",
     "limitEnrichments": "{count} enrichissements Google Places",
@@ -157,8 +412,8 @@
     "limitArea": "{count} km² de surface totale",
     "limitZoneArea": "{count} km² par zone",
     "billingNotice": "La facturation est gérée par Mollie. Annulez à tout moment — vos données vous appartiennent et restent exportables.",
-    "startTrial": "Démarrer l’essai gratuit",
-    "planRunning": "Votre essai ou abonnement est en cours — la prospection est déverrouillée. Gérez-le ou annulez-le à tout moment depuis l’écran Facturation.",
+    "subscribe": "S’abonner — 10 € aujourd’hui",
+    "planRunning": "Votre abonnement est en cours — la prospection est déverrouillée. Gérez-le ou annulez-le à tout moment depuis l’écran Facturation.",
     "manageSubscription": "Gérer l’abonnement",
     "sectorTitle": "Premier secteur",
     "sectorBody": "Dessinez un secteur sur la carte. Il se remplit avec chaque entreprise réellement enregistrée à cet endroit — le registre national des entreprises les connaît, et il est gratuit et sans clé. Chacune devient une cible portant deux nombres : le butin et la résistance.",
@@ -168,19 +423,20 @@
   "BillingPage": {
     "title": "Facturation",
     "backToOnboarding": "Retour à la configuration",
+    "backToFit": "Retour au test d’adéquation",
     "noticeCheckoutError": "Le paiement n’a pas pu être créé. Réessayez, ou revenez plus tard.",
     "noticeCancelError": "L’annulation n’a pas abouti. Réessayez, ou revenez plus tard.",
-    "noticeTermsError": "Confirmez les conditions d’usage professionnel avant de démarrer l’essai.",
+    "noticeTermsError": "Confirmez les conditions d’usage professionnel avant de vous abonner.",
     "noticeCanceled": "Abonnement annulé. L’accès reste ouvert jusqu’à la fin de la période payée.",
     "selfHostedTitle": "Instance auto-hébergée",
     "selfHostedBody": "La facturation n’est pas activée ici : pas de <code>MOLLIE_API_KEY</code>, pas d’abonnement, et pas de quota — chaque limite ci-dessous est désactivée. Cet écran n’a d’effet que sur le service hébergé.",
-    "statusNonePending": "Paiement démarré mais jamais terminé. Démarrez l’essai pour le finaliser.",
-    "statusNoneDefault": "Aucune carte enregistrée pour l’instant. L’essai démarre dès qu’une carte est ajoutée — rien n’est facturé aujourd’hui.",
+    "statusNonePending": "Paiement démarré mais jamais terminé. Continuez pour activer l’abonnement.",
+    "statusNoneDefault": "Aucun abonnement pour l’instant. Le premier mois est facturé lorsque le paiement est finalisé.",
     "statusTrialCanceledWithDate": "Essai annulé — l’accès reste ouvert jusqu’au {date}, et rien ne sera jamais facturé.",
     "statusTrialCanceled": "Essai annulé.",
     "statusTrialRunningWithDate": "Essai en cours — le premier paiement de {price} sera prélevé le {date}. Annulez avant cette date et rien ne sera facturé.",
     "statusTrialRunning": "Essai en cours.",
-    "statusExpired": "L’essai ou l’abonnement s’est terminé. Tout ce qui a été prospecté reste consultable ; abonnez-vous pour continuer.",
+    "statusExpired": "L’abonnement ou un ancien essai s’est terminé. Tout ce qui a été prospecté reste consultable ; abonnez-vous pour continuer.",
     "statusActiveWithDate": "Actif — renouvelé le {date}.",
     "statusActive": "Actif.",
     "statusCanceledWithDate": "Annulé — l’accès reste ouvert jusqu’au {date}.",
@@ -189,17 +445,16 @@
     "statusCompleted": "L’abonnement est arrivé à son terme. Abonnez-vous à nouveau pour continuer.",
     "testMode": "Mode test : les paiements passent par le bac à sable de Mollie, aucune carte réelle n’est débitée.",
     "perMonth": "/mois",
-    "trialNotice": "Essai gratuit de {days} jours — carte requise, rien n’est facturé avant son terme.",
+    "planNotice": "Sans essai gratuit — le premier mois est facturé aujourd’hui, puis le plan est renouvelé chaque mois.",
     "yourSubscription": "Votre abonnement",
     "surveyedThisPeriod": "sur cette période",
     "surveyedSoFar": "jusqu’ici",
     "usageLine": "{usedKm2} sur {maxKm2} km² prospectés {period} · {harvestUsed} sur {harvestLimit} entreprises · {enrichUsed} sur {enrichLimit} enrichissements · {auditUsed} sur {auditLimit} audits",
     "acceptTerms": "Je m’abonne dans un cadre professionnel et j’accepte les <link>conditions d’utilisation</link>.",
-    "startTrial": "Démarrer l’essai gratuit de {days} jours",
     "subscribe": "S’abonner — {price} €/mois",
     "cancelTrial": "Annuler l’essai",
     "cancelSubscription": "Annuler l’abonnement",
-    "cardRequiredNotice": "Une carte est requise pour démarrer l’essai — 0,00 € aujourd’hui, et le premier paiement seulement une fois l’essai terminé. ",
+    "chargeNotice": "Le paiement facture le premier mois aujourd’hui et crée le mandat pour les renouvellements suivants. ",
     "paymentsNotice": "Les paiements sont gérés par Mollie. Annulez à tout moment — l’accès reste ouvert jusqu’à la fin de la période payée et vos données existantes restent consultables."
   },
   "BillingReturn": {
@@ -741,8 +996,8 @@
     "couldNotSave": "Impossible d’enregistrer."
   },
   "Quotas": {
-    "startTrial": "Démarrez votre essai gratuit sur l’écran Facturation pour commencer à prospecter.",
-    "expired": "Votre essai ou votre abonnement a pris fin. Abonnez-vous sur l’écran Facturation pour continuer — tout ce qui a déjà été prospecté reste lisible.",
+    "subscribe": "Abonnez-vous sur l’écran Facturation pour commencer à prospecter.",
+    "expired": "Votre abonnement ou un ancien essai a pris fin. Abonnez-vous sur l’écran Facturation pour continuer — tout ce qui a déjà été prospecté reste lisible.",
     "reached": "Plafond atteint : {used} sur {limit} {kind, select, harvest {entreprises prospectées} enrich {enrichissements Google} audit {audits de site} area {km² prospectés} other {}} cette période. Gérez votre offre sur l’écran Facturation."
   },
   "PriceGridForm": {
@@ -835,13 +1090,12 @@
     "enrichThisFrame": "Enrichir cette vue",
     "enrichExplainer": "Google d’abord, puis l’audit de site interne. L’enrichissement nécessite une clé Google Places — ajoutez-en une dans Paramètres, ou définissez GOOGLE_PLACES_API_KEY. Google est la seule source d’adresse de site web, et l’audit n’a rien à lire sans elle. Cela ne fait avancer personne — cela ajoute seulement des faits.",
     "surveyingLocked": "Prospection verrouillée",
-    "surveyingExpired": "Votre essai ou abonnement est terminé. Tout ce qui a déjà été prospecté reste consultable — abonnez-vous pour continuer.",
-    "surveyingTrial": "La prospection s’ouvre avec l’essai gratuit de {days} jours. Une carte est requise, rien n’est facturé aujourd’hui, et annuler avant le terme ne coûte rien.",
+    "surveyingExpired": "Votre abonnement ou ancien essai est terminé. Tout ce qui a déjà été prospecté reste consultable — abonnez-vous pour continuer.",
+    "surveyingSubscribe": "La prospection s’ouvre avec l’abonnement Pro. Le premier mois est facturé aujourd’hui, puis il est renouvelé chaque mois.",
     "subscribe": "S’abonner",
-    "startFreeTrial": "Démarrer l’essai gratuit",
     "notNow": "Pas maintenant",
     "paymentConfirmed": "Paiement confirmé",
-    "paymentConfirmedBody": "Votre essai ou abonnement est en cours — la carte est entièrement déverrouillée. Gérez-le ou annulez-le à tout moment depuis le menu, sous « Facturation et abonnement ».",
+    "paymentConfirmedBody": "Votre abonnement est en cours — la carte est entièrement déverrouillée. Gérez-le ou annulez-le à tout moment depuis le menu, sous « Facturation et abonnement ».",
     "gotIt": "Compris",
     "surveyRunning": "Prospection en cours",
     "survey": "Prospection",

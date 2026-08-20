@@ -2,12 +2,7 @@
 // primary key), written from exactly two places: the /billing actions and the
 // Mollie webhook. Everything here is inert without MOLLIE_API_KEY.
 //
-// The hosted lifecycle: signup → `none` (nothing costly allowed) → a €0.00
-// first payment captures a card mandate → 14-day trial on full Pro limits,
-// with a Mollie subscription scheduled for the trial's end → Mollie charges on
-// its own schedule → every paid webhook rolls the month forward. `expired` is
-// every dead end at once: trial never converted, suspension, cancellation past
-// its period. Data stays readable in every state; only surveying is gated.
+// The hosted lifecycle charges the first month up front, then schedules renewals.
 
 import "server-only";
 
@@ -19,7 +14,6 @@ import { appUrl, sendEmail, type EmailContent } from "@/lib/email/resend";
 import {
   subscriptionActivatedEmail,
   subscriptionSuspendedEmail,
-  trialStartedEmail,
 } from "@/lib/email/templates";
 import type { SubscriptionStatus } from "@/lib/types";
 
@@ -32,7 +26,7 @@ import {
   mollieEnabled,
   type MolliePayment,
 } from "./mollie";
-import { PRO_PLAN, TRIAL_DAYS } from "./plans";
+import { PRO_PLAN } from "./plans";
 
 export async function getSubscriptionRow(
   ownerId: string,
@@ -102,8 +96,7 @@ export async function getBillingState(
     return { state: "active", periodStart: row.currentPeriodStart, row };
   }
 
-  // a row with neither a consumed trial nor a paid period is an abandoned
-  // checkout: the account still owes the mandate.
+  // A row without a legacy trial or paid period is an abandoned checkout.
   if (!row.trialEndsAt && !row.currentPeriodEnd) {
     return { state: "none", periodStart: null, row };
   }
@@ -147,10 +140,6 @@ function addOneMonth(date: Date): Date {
   ).getUTCDate();
   next.setUTCDate(Math.min(day, lastDay));
   return next;
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
 function toDateOnly(date: Date): string {
@@ -214,20 +203,20 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
   const row = await getSubscriptionRow(ownerId);
   const previousStatus: SubscriptionStatus | "none" = row?.status ?? "none";
 
-  // The €0.00 mandate payment: no money moved, the card is now chargeable.
-  // The only "first" payments this product creates are those zero-amount
-  // captures, so the sequence type is the whole discriminant. Zero-amount
-  // card payments may settle as "authorized" rather than "paid".
+  // A successful first-sequence payment opens the first paid month and mandate.
   if (
     payment.sequenceType === "first" &&
     payment.customerId &&
-    (payment.status === "paid" || payment.status === "authorized")
+    payment.status === "paid" &&
+    payment.paidAt &&
+    payment.amount?.currency === "EUR" &&
+    Number(payment.amount.value) * 100 === PRO_PLAN.priceCents
   ) {
-    // replay or double delivery: the subscription already exists, done.
     if (row?.mollieSubscriptionId) return;
 
     const customerId = payment.customerId;
-    const mandateAt = payment.paidAt ? new Date(payment.paidAt) : new Date();
+    const periodStart = new Date(payment.paidAt);
+    const periodEnd = addOneMonth(periodStart);
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}))`);
@@ -238,8 +227,6 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
         .limit(1);
       if (lockedRow?.mollieSubscriptionId) return null;
 
-      const startsTrial = !lockedRow?.trialEndsAt;
-      const periodEnd = startsTrial ? addDays(mandateAt, TRIAL_DAYS) : null;
       const created =
         (await findReusableSubscription(customerId, ownerId, payment.id)) ??
         (await createSubscription({
@@ -248,26 +235,18 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
           priceCents: PRO_PLAN.priceCents,
           interval: PRO_PLAN.interval,
           description: `Towncenter ${PRO_PLAN.name}`,
-          startDate: toDateOnly(periodEnd ?? mandateAt),
+          startDate: toDateOnly(periodEnd),
           webhookUrl: mollieWebhookUrl(),
           mandatePaymentId: payment.id,
         }));
 
-      const patch = startsTrial
-        ? {
-            mollieCustomerId: customerId,
-            mollieSubscriptionId: created.id,
-            status: "active" as const,
-            currentPeriodStart: mandateAt,
-            currentPeriodEnd: periodEnd,
-            trialEndsAt: periodEnd,
-            trialReminderSentAt: null,
-          }
-        : {
-            mollieCustomerId: customerId,
-            mollieSubscriptionId: created.id,
-            status: "pending" as const,
-          };
+      const patch = {
+        mollieCustomerId: customerId,
+        mollieSubscriptionId: created.id,
+        status: "active" as const,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+      };
 
       await tx
         .insert(subscriptions)
@@ -276,22 +255,25 @@ export async function applyMolliePayment(paymentId: string): Promise<void> {
           target: subscriptions.ownerId,
           set: { ...patch, updatedAt: new Date() },
         });
-      return { startsTrial, periodEnd };
+      return { periodEnd };
     });
 
-    if (result?.startsTrial && result.periodEnd) {
+    if (result) {
       await notify(ownerId, (contact) =>
-        trialStartedEmail({
+        subscriptionActivatedEmail({
           name: contact.displayName,
-          firstChargeAt: result.periodEnd!,
-          billingUrl: billingScreenUrl(),
+          periodEnd: result.periodEnd,
         }),
       );
     }
     return;
   }
 
-  if (payment.status === "paid" && payment.paidAt) {
+  if (
+    payment.sequenceType === "recurring" &&
+    payment.status === "paid" &&
+    payment.paidAt
+  ) {
     // Real money: a subscription charge. Roll the paid month forward.
     const periodStart = new Date(payment.paidAt);
     const periodEnd = addOneMonth(periodStart);

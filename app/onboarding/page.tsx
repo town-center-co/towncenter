@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { requireUser } from "@/lib/accounts";
-import { PRO_PLAN, TRIAL_DAYS } from "@/lib/billing/plans";
+import { PRO_PLAN } from "@/lib/billing/plans";
 import { MAX_ZONE_AREA_KM2 } from "@/lib/limits";
 import { getOnboardingFacts, type OnboardingFacts } from "@/app/queries";
 import { ConsumeBillingStarted } from "@/components/billing/ConsumeBillingStarted";
@@ -31,13 +31,12 @@ export const dynamic = "force-dynamic";
 type T = Awaited<ReturnType<typeof getTranslations>>;
 
 const SELF_HOSTED_STEPS = ["key", "grid", "sector"] as const;
-const SAAS_STEPS = ["grid", "upgrade", "sector"] as const;
+const SAAS_STEPS = ["upgrade", "grid", "sector"] as const;
 
 function firstIncomplete(facts: OnboardingFacts): string {
   if (!facts.isSaaS && facts.placesKeySource === null) return "key";
-  if (!facts.hasCustomGrid) return "grid";
-  // Billing must unlock surveying before the first sector.
   if (facts.isSaaS && !facts.planChosen) return "upgrade";
+  if (!facts.hasCustomGrid) return "grid";
   if (facts.sectorCount === 0) return "sector";
   return "sector";
 }
@@ -135,10 +134,10 @@ function stepsFor(facts: OnboardingFacts, t: T): StepMeta[] {
   if (!facts.isSaaS) {
     items.push({ key: "key", label: t("stepConnectPlaces"), done: facts.placesKeySource !== null });
   }
-  items.push({ key: "grid", label: t("stepReviewGrid"), done: facts.hasCustomGrid });
   if (facts.isSaaS) {
     items.push({ key: "upgrade", label: t("stepChoosePlan"), done: facts.planChosen });
   }
+  items.push({ key: "grid", label: t("stepReviewGrid"), done: facts.hasCustomGrid });
   items.push({ key: "sector", label: t("stepSurveySector"), done: facts.sectorCount > 0 });
   return items;
 }
@@ -252,7 +251,7 @@ function GridStep({ facts, t }: { facts: OnboardingFacts; t: T }) {
         </Link>
         <Link
           href={
-            facts.isSaaS ? "/onboarding?step=upgrade" : "/onboarding?step=sector"
+            "/onboarding?step=sector"
           }
           className={styles.stepLink}
         >
@@ -286,7 +285,7 @@ function UpgradeStep({ facts, t }: { facts: OnboardingFacts; t: T }) {
   return (
     <>
       <Badge asChild><h2>{t("planTitle")}</h2></Badge>
-      <p className="t-body">{t("planBody", { days: TRIAL_DAYS, price })}</p>
+      <p className="t-body">{t("planBody", { price })}</p>
       <Card className={styles.upgradeCard}>
         <div className={styles.upgradePlan}>
           <span className={styles.upgradePlanName}>{PRO_PLAN.name}</span>
@@ -306,7 +305,7 @@ function UpgradeStep({ facts, t }: { facts: OnboardingFacts; t: T }) {
       <p className="t-body-s tone-2">{t("billingNotice")}</p>
       <div className={styles.stepActions}>
         <a className={styles.upgradeCta} href="/billing?from=onboarding">
-          {t("startTrial")}
+          {t("subscribe")}
         </a>
       </div>
     </>

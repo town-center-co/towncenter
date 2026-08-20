@@ -36,9 +36,9 @@ const LIMIT_BY_KIND: Record<QuotaKind, number> = {
 // Component read, or the `verify-actions.mts` bench, which stubs
 // `next/headers` with a working session) — never a request-less pure module —
 // so `getTranslations()` is always safe to call directly.
-export async function quotaStartTrialMessage(): Promise<string> {
+export async function quotaSubscribeMessage(): Promise<string> {
   const t = await getTranslations("Quotas");
-  return t("startTrial");
+  return t("subscribe");
 }
 
 export async function quotaExpiredMessage(): Promise<string> {
@@ -93,7 +93,7 @@ export async function checkQuotaWithState(
       allowed: false,
       used: 0,
       limit: LIMIT_BY_KIND[kind],
-      message: await quotaStartTrialMessage(),
+      message: await quotaSubscribeMessage(),
     };
   }
 

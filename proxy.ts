@@ -12,6 +12,7 @@ const LOGIN_PATH = "/login";
 // webhook carries no session; the route authenticates by fetching the id back.
 const PUBLIC_ROUTES = new Set<string>([
   LOGIN_PATH,
+  "/fit",
   "/signup",
   "/forgot-password",
   "/reset-password",
@@ -23,7 +24,7 @@ export async function proxy(request: NextRequest) {
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = await verifySessionToken(token);
-  const isPublic = PUBLIC_ROUTES.has(pathname);
+  const isPublic = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/fit/");
 
   if (session || isPublic) {
     return NextResponse.next();

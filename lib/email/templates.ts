@@ -88,12 +88,11 @@ export function passwordResetEmail(input: {
 
 export function welcomeEmail(input: {
   name: string | null;
-  /** Days of trial, or null outside the hosted SaaS. */
-  trialDays: number | null;
+  hosted: boolean;
 }): EmailContent {
   const subject = "Welcome to Towncenter";
-  const trialLine = input.trialDays
-    ? `Start your ${input.trialDays}-day free trial from the Billing screen — a card is required but nothing is charged until the trial ends, and you can cancel any time before.`
+  const nextLine = input.hosted
+    ? `Activate ${PRO_PLAN.name} from the Billing screen. The first month costs ${PRICE_LABEL} and is charged when you complete checkout.`
     : "Draw a zone on the map to survey your first street.";
   return {
     subject,
@@ -103,46 +102,14 @@ export function welcomeEmail(input: {
         paragraph(
           "Your account is ready. Towncenter maps the businesses of a territory so you can work it street by street.",
         ) +
-        paragraph(escapeHtml(trialLine)),
+        paragraph(escapeHtml(nextLine)),
     ),
     text: [
       greeting(input.name),
       "",
       "Your account is ready. Towncenter maps the businesses of a territory so you can work it street by street.",
       "",
-      trialLine,
-    ].join("\n"),
-  };
-}
-
-export function trialStartedEmail(input: {
-  name: string | null;
-  firstChargeAt: Date;
-  billingUrl: string;
-}): EmailContent {
-  const subject = "Your Towncenter trial is active";
-  const when = formatDate(input.firstChargeAt);
-  return {
-    subject,
-    html: layout(
-      subject,
-      paragraph(escapeHtml(greeting(input.name))) +
-        paragraph(
-          `Your 14-day trial has started with the full ${escapeHtml(PRO_PLAN.name)} limits. Nothing was charged today.`,
-        ) +
-        paragraph(
-          `The first payment of ${PRICE_LABEL} runs on <strong>${when}</strong>. Cancel before that date from the Billing screen and you will never be charged.`,
-        ) +
-        button(input.billingUrl, "Manage your plan"),
-    ),
-    text: [
-      greeting(input.name),
-      "",
-      `Your 14-day trial has started with the full ${PRO_PLAN.name} limits. Nothing was charged today.`,
-      "",
-      `The first payment of ${PRICE_LABEL} runs on ${when}. Cancel before that date from the Billing screen and you will never be charged.`,
-      "",
-      input.billingUrl,
+      nextLine,
     ].join("\n"),
   };
 }

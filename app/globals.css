@@ -22,7 +22,7 @@
    stopped working. Same rule for the storage key (`towncenter-theme`), for
    `data-band`, and every class name in this file.
 
-   LIGHT is the default: a plan laid on a table.
+   The system setting chooses the first theme; an explicit choice is stored.
 
    Non-collision rules:
    1. ONE accent colour, the cobalt `--accent`. It carries links, actions, the
@@ -1681,20 +1681,17 @@ li:hover .source,
 /* ==========================================================================
    THE THEME TOGGLE.
 
-   A bordered pill, a pictogram and a label — and both STATE THE DESTINATION,
-   never the current state. The complaint usually levelled at a toggle, that it
-   makes you guess what it will do, is answered by naming the action, not by
-   doubling the button into a segmented control.
+   A bordered circle and a pictogram. The accessible label and tooltip state
+   the destination, never the current state.
    ========================================================================== */
 
 .toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  width: var(--touch-target);
   min-height: var(--touch-target);
-  min-width: var(--touch-target);
-  padding: 0 var(--space-3);
+  padding: 0;
   border-radius: var(--radius-dot);
   border: 1px solid var(--border-1);
   background: transparent;

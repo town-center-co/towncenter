@@ -4,11 +4,15 @@
 export const THEME_STORAGE_KEY = "towncenter-theme";
 
 export type Theme = "dark" | "light";
+export type ThemePreference = Theme | "system";
 
+// The server cannot read the OS preference; the first paint is corrected by THEME_SCRIPT.
 export const DEFAULT_THEME: Theme = "light";
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";
 
-// runs in <head> before paint, so a stored dark theme never flashes light.
+// Resolve the system preference before paint so the default follows the OS.
 export const THEME_SCRIPT = `(function(){try{
-var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
-if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;}
+var stored=null;try{stored=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});}catch(e){}
+var t=stored==="light"||stored==="dark"?stored:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+document.documentElement.dataset.theme=t;
 }catch(e){}})();`;

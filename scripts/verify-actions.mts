@@ -52,6 +52,7 @@ import {
 } from "@/lib/db";
 import { areaKm2 } from "@/lib/geo";
 import { openZone } from "@/lib/harvest";
+import { createFirstPayment } from "@/lib/billing/mollie";
 import { applyMolliePayment } from "@/lib/billing/subscriptions";
 import { MAX_CUMULATIVE_AREA_KM2 } from "@/lib/limits";
 import { resetPassword } from "@/lib/passwordReset";
@@ -356,10 +357,15 @@ async function main() {
     `${openedZones.length} opened, ${refusedZones.length} refused`,
   );
 
-  // Two mandate payments racing after a double checkout must create one subscription.
+  // Two first-month payments racing after a double checkout create one subscription.
   await db.insert(subscriptions).values({
     ownerId: stranger.id,
     mollieCustomerId: "cst_bench",
+    status: "pending",
+  });
+  await db.insert(subscriptions).values({
+    ownerId: resetOwner.id,
+    mollieCustomerId: "cst_legacy_zero",
     status: "pending",
   });
   await db.insert(subscriptions).values({
@@ -374,12 +380,39 @@ async function main() {
   const realAppUrl = process.env.APP_URL;
   const realMollieKey = process.env.MOLLIE_API_KEY;
   const mollieSubscriptions: Array<Record<string, unknown>> = [];
+  const subscriptionRequests: Array<Record<string, unknown>> = [];
   let subscriptionCreates = 0;
+  let firstPaymentIdempotency: string | null = null;
+  let firstPaymentAmount: string | null = null;
   process.env.APP_URL = "https://app.towncenter.test";
   process.env.MOLLIE_API_KEY = "test_bench";
   globalThis.fetch = async (input, init) => {
     const url = String(input);
+    if (init?.method === "POST" && url.endsWith("/payments")) {
+      const body = JSON.parse(String(init.body)) as {
+        amount?: { value?: string };
+      };
+      firstPaymentIdempotency = new Headers(init.headers).get("Idempotency-Key");
+      firstPaymentAmount = body.amount?.value ?? null;
+      return Response.json({
+        id: "tr_first_bench",
+        status: "open",
+        sequenceType: "first",
+        _links: { checkout: { href: "https://checkout.towncenter.test/first" } },
+      });
+    }
     if (url.includes("/payments/")) {
+      if (url.endsWith("tr_legacy_zero")) {
+        return Response.json({
+          id: "tr_legacy_zero",
+          status: "paid",
+          paidAt: "2026-03-05T10:20:30.000Z",
+          amount: { currency: "EUR", value: "0.00" },
+          customerId: "cst_legacy_zero",
+          sequenceType: "first",
+          metadata: { ownerId: resetOwner.id },
+        });
+      }
       if (url.endsWith("tr_renewal_new") || url.endsWith("tr_renewal_old")) {
         const isNew = url.endsWith("tr_renewal_new");
         return Response.json({
@@ -396,7 +429,9 @@ async function main() {
       }
       return Response.json({
         id: url.endsWith("tr_bench_one") ? "tr_bench_one" : "tr_bench_two",
-        status: "authorized",
+        status: "paid",
+        paidAt: "2026-03-05T10:20:30.000Z",
+        amount: { currency: "EUR", value: "10.00" },
         customerId: "cst_bench",
         sequenceType: "first",
         metadata: { ownerId: stranger.id },
@@ -404,9 +439,10 @@ async function main() {
     }
     if (init?.method === "POST" && url.includes("/subscriptions")) {
       subscriptionCreates += 1;
-      const body = JSON.parse(String(init.body)) as {
+      const body = JSON.parse(String(init.body)) as Record<string, unknown> & {
         metadata: Record<string, unknown>;
       };
+      subscriptionRequests.push(body);
       const created = {
         id: `sub_bench_${subscriptionCreates}`,
         status: "active",
@@ -424,10 +460,20 @@ async function main() {
   };
 
   try {
+    await createFirstPayment({
+      customerId: "cst_bench",
+      ownerId: stranger.id,
+      amountCents: 1_000,
+      description: "Towncenter Pro — first month",
+      redirectUrl: "https://app.towncenter.test/billing/return",
+      webhookUrl: "https://app.towncenter.test/api/mollie/webhook",
+      idempotencyKey: "towncenter-first-bench",
+    });
     await Promise.all([
       applyMolliePayment("tr_bench_one"),
       applyMolliePayment("tr_bench_two"),
     ]);
+    await applyMolliePayment("tr_legacy_zero");
     await applyMolliePayment("tr_renewal_new");
     await applyMolliePayment("tr_renewal_old");
   } finally {
@@ -439,14 +485,52 @@ async function main() {
   }
 
   const [billingRow] = await db
-    .select({ subscriptionId: subscriptions.mollieSubscriptionId })
+    .select({
+      subscriptionId: subscriptions.mollieSubscriptionId,
+      status: subscriptions.status,
+      periodStart: subscriptions.currentPeriodStart,
+      periodEnd: subscriptions.currentPeriodEnd,
+      trialEnd: subscriptions.trialEndsAt,
+    })
     .from(subscriptions)
     .where(eq(subscriptions.ownerId, stranger.id))
     .limit(1);
   check(
-    "concurrent mandate webhooks create one Mollie subscription",
+    "first-month checkout is €10 and carries its idempotency key",
+    firstPaymentAmount === "10.00" &&
+      firstPaymentIdempotency === "towncenter-first-bench",
+  );
+  check(
+    "concurrent first-payment webhooks create one Mollie subscription",
     subscriptionCreates === 1 && billingRow?.subscriptionId === "sub_bench_1",
     `${subscriptionCreates} created`,
+  );
+  const firstSubscriptionRequest = subscriptionRequests[0] as
+    | {
+        amount?: { value?: string };
+        startDate?: string;
+      }
+    | undefined;
+  check(
+    "the paid first month opens access and schedules renewal one month later",
+    billingRow?.status === "active" &&
+      billingRow.periodStart?.toISOString() === "2026-03-05T10:20:30.000Z" &&
+      billingRow.periodEnd?.toISOString() === "2026-04-05T10:20:30.000Z" &&
+      billingRow.trialEnd === null &&
+      firstSubscriptionRequest?.amount?.value === "10.00" &&
+      firstSubscriptionRequest.startDate === "2026-04-05",
+  );
+  const [legacyZeroRow] = await db
+    .select({
+      subscriptionId: subscriptions.mollieSubscriptionId,
+      periodEnd: subscriptions.currentPeriodEnd,
+    })
+    .from(subscriptions)
+    .where(eq(subscriptions.ownerId, resetOwner.id))
+    .limit(1);
+  check(
+    "an in-flight legacy €0 checkout cannot open a paid month",
+    legacyZeroRow?.subscriptionId === null && legacyZeroRow.periodEnd === null,
   );
   const [renewalRow] = await db
     .select({

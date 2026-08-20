@@ -33,6 +33,258 @@
     "enterEmailAddress": "Enter your email address.",
     "entryRefused": "Entry refused."
   },
+  "FitFunnel": {
+    "metadataTitle": "Is Towncenter right for you?",
+    "metadataDescription": "A two-minute path for new and established web freelancers who want to find local clients in France.",
+    "progress": "Question {current} of {total}",
+    "back": "Back",
+    "continue": "Continue",
+    "footer": "A focused prospecting tool for France — not a CRM.",
+    "signIn": "Already a customer? Sign in",
+    "intro": {
+      "eyebrow": "Your local prospecting path",
+      "title": "Find the right way to start looking for local clients.",
+      "subtitle": "Tell us where you are today. We will shape a different path for people starting out and people already working with clients.",
+      "time": "About 2 minutes",
+      "noAccount": "No account needed",
+      "priceUpfront": "€10/month if it fits",
+      "cta": "Build my path",
+      "finePrint": "Six short questions before your result. No account or payment yet."
+    },
+    "pre": {
+      "kicker": "Your starting point",
+      "autoAdvance": "Choose the closest answer. We will move on automatically.",
+      "stage": {
+        "title": "Where are you today?",
+        "subtitle": "This sets the path. It does not change the price or hide features.",
+        "options": {
+          "preparing": { "label": "I’m preparing to start", "detail": "I am building my offer and getting ready to find clients." },
+          "firstClients": { "label": "I’ve started, but need clients", "detail": "I want my first regular flow of projects." },
+          "established": { "label": "I already work with clients", "detail": "I want a better way to find the next ones." }
+        }
+      },
+      "service": {
+        "title": "What do you sell, or plan to sell?",
+        "subtitle": "Choose the service you want local businesses to know you for.",
+        "options": {
+          "websites": { "label": "New websites", "detail": "Design and build a business’s first or next website." },
+          "redesigns": { "label": "Website redesigns", "detail": "Replace sites that are dated, unclear or ineffective." },
+          "maintenance": { "label": "Maintenance and ongoing services", "detail": "Updates, care plans and recurring website work." },
+          "broader": { "label": "Broader digital services", "detail": "Websites are one part of a wider offer." },
+          "undecided": { "label": "I haven’t decided yet", "detail": "I am still shaping what I want to sell." }
+        }
+      },
+      "audience": {
+        "title": "Who would you like to work with?",
+        "subtitle": "Towncenter is deliberately focused on small, local organisations.",
+        "options": {
+          "shops": { "label": "Shops and restaurants", "detail": "Independent places that serve a local neighbourhood." },
+          "professionals": { "label": "Local professionals", "detail": "Practices, consultants and service businesses." },
+          "trades": { "label": "Tradespeople", "detail": "Local craft, construction and home-service businesses." },
+          "companies": { "label": "Small companies", "detail": "Independent businesses with a local presence." },
+          "exploring": { "label": "I’m still exploring", "detail": "I have not chosen a specific client type yet." }
+        }
+      },
+      "location": {
+        "title": "Where do you want to find clients?",
+        "subtitle": "Automatic business discovery currently uses French public data.",
+        "options": {
+          "france": { "label": "Mainly in France", "detail": "My first or next territory will be in France." },
+          "mixed": { "label": "France and elsewhere", "detail": "French local businesses are part of my market." },
+          "outside": { "label": "Outside France", "detail": "I do not plan to prospect French businesses." }
+        }
+      },
+      "startingReadiness": {
+        "title": "If a business said yes tomorrow, could you deliver?",
+        "subtitle": "A prospecting tool is useful only when you can fulfil the work it helps you find.",
+        "options": {
+          "independent": { "label": "Yes, independently", "detail": "I can scope and deliver the service myself." },
+          "support": { "label": "Yes, with a template or support", "detail": "I can deliver with a framework I already understand." },
+          "practice": { "label": "I still need more practice", "detail": "I am learning before taking on a real project." },
+          "unclear": { "label": "I’m not sure what I would offer", "detail": "My service is not concrete enough to sell yet." }
+        }
+      },
+      "startingBlocker": {
+        "title": "What is stopping you from prospecting today?",
+        "subtitle": "We will use this to shape the first milestone in your plan.",
+        "options": {
+          "prospects": { "label": "I don’t know who to contact", "detail": "Finding suitable businesses is the hardest part." },
+          "message": { "label": "I don’t know what to say", "detail": "I need a clearer reason to start a conversation." },
+          "pricing": { "label": "I’m unsure about my prices", "detail": "I need to connect my offer with a realistic value." },
+          "confidence": { "label": "I lack confidence", "detail": "I need a smaller, more concrete first step." },
+          "routine": { "label": "I don’t have a routine", "detail": "Prospecting never gets a protected place in my week." }
+        }
+      },
+      "establishedSource": {
+        "title": "Where do your clients currently come from?",
+        "subtitle": "This tells us what Towncenter would need to complement or replace.",
+        "options": {
+          "referrals": { "label": "Mostly referrals", "detail": "Good work arrives, but not on a predictable schedule." },
+          "inbound": { "label": "Inbound enquiries", "detail": "People usually find and contact me first." },
+          "maps": { "label": "Maps and directories", "detail": "I already search local businesses online." },
+          "manual": { "label": "Manual research", "detail": "I assemble lists one business at a time." },
+          "mixed": { "label": "A mixture of sources", "detail": "No single channel supplies the whole pipeline." }
+        }
+      },
+      "establishedBottleneck": {
+        "title": "What takes the most effort in prospecting?",
+        "subtitle": "Choose the constraint you would remove first.",
+        "options": {
+          "enough": { "label": "Finding enough businesses", "detail": "The top of the prospect list is too small." },
+          "quality": { "label": "Knowing who is worth contacting", "detail": "Too much research leads to weak opportunities." },
+          "start": { "label": "Knowing where to start", "detail": "Each session begins with a blank page." },
+          "data": { "label": "Collecting useful information", "detail": "The facts I need are spread across several places." },
+          "consistency": { "label": "Following through consistently", "detail": "Prospecting slips when client work gets busy." }
+        }
+      }
+    },
+    "analysis": {
+      "kicker": "Checking the match",
+      "title": "Comparing your answers with Towncenter’s scope",
+      "starting": {
+        "market": "Market: local businesses covered by French public data",
+        "offer": "Readiness: a service you can deliver for a real client",
+        "motion": "Starting point: one concrete obstacle to work through"
+      },
+      "established": {
+        "market": "Market: local businesses covered by French public data",
+        "offer": "Offer: project-based digital services",
+        "motion": "Workflow: a prospecting process Towncenter can improve"
+      }
+    },
+    "result": {
+      "starting": {
+        "seal": "Ready to prospect",
+        "kicker": "Your starting path",
+        "title": "You are ready to build your first local prospecting routine.",
+        "subtitle": "You can deliver useful work and you have a French local market to explore. Towncenter can replace the blank page with a concrete territory and next actions.",
+        "criteria": { "one": "A service you can deliver", "two": "A reachable local market", "three": "A clear first obstacle" },
+        "cta": "Build my starting plan"
+      },
+      "established": {
+        "seal": "Strong fit",
+        "kicker": "Your growth path",
+        "title": "Towncenter can make your local prospecting more selective.",
+        "subtitle": "Your offer and market already exist. The opportunity is to spend less effort assembling lists and more time on businesses worth approaching.",
+        "criteria": { "one": "French company data", "two": "Selective local prospecting", "three": "Ranked next actions" },
+        "cta": "Shape my weekly plan"
+      }
+    },
+    "post": {
+      "starting": {
+        "goals": {
+          "kicker": "Your first milestone",
+          "title": "What would you like to achieve first?",
+          "subtitle": "Choose the next result that would feel real and useful—not the final destination.",
+          "options": {
+            "territory": { "label": "Choose my first area", "detail": "Know which neighbourhood to begin with." },
+            "shortlist": { "label": "Build a prospect shortlist", "detail": "Turn a territory into businesses worth reviewing." },
+            "outreach": { "label": "Contact my first prospects", "detail": "Move from research into a real approach." },
+            "conversation": { "label": "Book my first conversation", "detail": "Create an opportunity to discuss a project." },
+            "client": { "label": "Sign my first client", "detail": "Work backwards from the first paid project." }
+          }
+        },
+        "rhythms": {
+          "kicker": "Your working rhythm",
+          "title": "What prospecting rhythm feels realistic?",
+          "subtitle": "A smaller rhythm you can repeat is more useful than an ambitious plan you abandon.",
+          "options": {
+            "daily": { "label": "15 minutes most days", "detail": "Make small progress alongside learning and client work." },
+            "weekly": { "label": "One focused session a week", "detail": "Review and shortlist businesses in one protected block." },
+            "twice": { "label": "Two focused sessions a week", "detail": "Separate research from outreach and follow-up." },
+            "recommend": { "label": "Recommend a rhythm", "detail": "Start with a manageable default and adjust later." }
+          }
+        }
+      },
+      "established": {
+        "goals": {
+          "kicker": "Your first improvement",
+          "title": "What should Towncenter improve first?",
+          "subtitle": "Choose the part of your current process that matters most.",
+          "options": {
+            "more": { "label": "Find more prospects", "detail": "Keep the top of the pipeline supplied." },
+            "better": { "label": "Identify better prospects", "detail": "Prioritise opportunities that deserve attention." },
+            "time": { "label": "Reduce research time", "detail": "Stop assembling the same facts by hand." },
+            "consistency": { "label": "Prospect more consistently", "detail": "Give prospecting a repeatable place in the week." }
+          }
+        },
+        "rhythms": {
+          "kicker": "Your weekly pace",
+          "title": "How many new businesses do you want to review each week?",
+          "subtitle": "This is a review target, not a promise to contact every business.",
+          "options": {
+            "five": { "label": "5 businesses", "detail": "A light, highly selective routine." },
+            "ten": { "label": "10 businesses", "detail": "A focused weekly shortlist." },
+            "twenty": { "label": "20 businesses", "detail": "A steady outbound rhythm." },
+            "thirty": { "label": "More than 30", "detail": "A larger territory and more frequent review." }
+          }
+        }
+      }
+    },
+    "plan": {
+      "starting": {
+        "kicker": "Your starting plan",
+        "title": "Turn one neighbourhood into your first repeatable routine.",
+        "subtitle": "Towncenter will not teach the craft or promise a client. It gives you a concrete place to begin and real businesses to evaluate.",
+        "goalLabel": "First milestone",
+        "rhythmLabel": "Working rhythm",
+        "steps": {
+          "one": { "title": "Define one offer and a starting price", "detail": "Use a service you can already deliver for a real business." },
+          "two": { "title": "Survey one manageable territory", "detail": "Build a real list from the French national company register." },
+          "three": { "title": "Review a short set every week", "detail": "Turn the strongest businesses into specific next actions." }
+        }
+      },
+      "established": {
+        "kicker": "Your weekly plan",
+        "title": "A more selective local prospecting routine.",
+        "subtitle": "Use your existing offer and pricing to decide which nearby businesses deserve the next hour of research or outreach.",
+        "goalLabel": "First improvement",
+        "rhythmLabel": "Weekly pace",
+        "steps": {
+          "one": { "title": "Calibrate your price grid", "detail": "Use the value of the services you actually sell." },
+          "two": { "title": "Survey one active territory", "detail": "Replace manual list building with French company data." },
+          "three": { "title": "Work the highest-value next actions", "detail": "Research and contact a short, ranked set each week." }
+        }
+      },
+      "cta": "See the plan and price"
+    },
+    "paywall": {
+      "kicker": "One plan, no trial",
+      "starting": {
+        "title": "Build your first local prospect shortlist",
+        "subtitle": "Start with one territory and a routine shaped around your first milestone."
+      },
+      "established": {
+        "title": "Find and prioritise your next local clients",
+        "subtitle": "Replace manual research with a ranked territory of worthwhile prospects."
+      },
+      "perMonth": "per month",
+      "harvest": "Up to {count, number} businesses harvested per period",
+      "enrich": "{count, number} Google Places enrichments",
+      "audits": "{count, number} website audits",
+      "area": "{area, number} km² per period, up to {zone, number} km² per zone",
+      "today": "Charged today",
+      "then": "Then",
+      "monthly": "€{price}/month",
+      "cancel": "Cancel any time. Access remains open until the end of the paid period.",
+      "cta": "Create my account — €{price} today",
+      "accountNext": "Account creation is the next short step; payment follows securely through Mollie."
+    },
+    "mismatch": {
+      "outside": {
+        "kicker": "Outside the current coverage",
+        "title": "Towncenter does not yet discover businesses outside France.",
+        "subtitle": "Its automatic search relies on French public company data. We would rather say that now than sell you a tool that cannot cover your market."
+      },
+      "notReady": {
+        "kicker": "One step before prospecting",
+        "title": "Clarify the offer before paying for prospecting software.",
+        "subtitle": "Towncenter can find and rank businesses, but it cannot replace the practice needed to deliver a project or define what you sell. Come back when one service feels ready for a real client."
+      },
+      "restart": "Review my answers",
+      "site": "Explore the product"
+    }
+  },
   "Gate": {
     "tagline": "Neighbourhood prospecting, street by street."
   },
@@ -73,8 +325,10 @@
     "backToSignIn": "Back to sign in",
     "claimTitle": "Claim this instance",
     "createTitle": "Create your account",
+    "fitTitle": "Your territory plan is ready",
     "claimSubtitle": "You are the first here. This account will own the territory.",
     "createSubtitle": "One account, one territory. Nothing is shared between them.",
+    "fitSubtitle": "Save your plan with an email and password. Secure payment is the next and final step.",
     "toggle": "Already have an account? <link>Sign in</link>"
   },
   "SignUp": {
@@ -83,7 +337,8 @@
     "nameHint": "Optional. It only shows in the account menu.",
     "creating": "Creating…",
     "claim": "Claim this instance",
-    "create": "Create account"
+    "create": "Create account",
+    "continueToPayment": "Continue to secure payment"
   },
   "ForgotPasswordPage": {
     "title": "Locked out?",
@@ -132,9 +387,9 @@
   },
   "OnboardingPage": {
     "title": "Set up your territory",
-    "subtitleSaas": "Two things to do before the map becomes useful, and a plan to pick. Each step is backed by a measured fact — skip any and come back to it.",
+    "subtitleSaas": "Activate your plan, calibrate your prices, then survey a first sector. Each setup step is backed by a measured fact.",
     "subtitleSelfHosted": "Three things to do before the map becomes useful. Each one is backed by a measured fact — skip any step and come back to it.",
-    "paymentConfirmed": "Payment confirmed — your free trial is running. Nothing is charged until it ends, and you can cancel anytime from the Billing screen.",
+    "paymentConfirmed": "Payment confirmed — your first paid month is active. You can manage or cancel the subscription anytime from Billing.",
     "stepConnectPlaces": "Connect Google Places",
     "stepReviewGrid": "Review your price grid",
     "stepChoosePlan": "Choose a plan",
@@ -149,7 +404,7 @@
     "openSettings": "Open settings",
     "keepDefaultGrid": "Keep the default grid →",
     "planTitle": "Plan",
-    "planBody": "Towncenter is a {days}-day free trial, then €{price}/month — one plan, no tiers. A card is required to start the trial, but nothing is charged until it ends, and cancelling before then costs nothing.",
+    "planBody": "Towncenter is €{price}/month — one plan, no tiers and no free trial. The first month is charged today, then the subscription renews monthly.",
     "perMonth": "/month",
     "limitHarvested": "{count} businesses harvested",
     "limitEnrichments": "{count} Google Places enrichments",
@@ -157,8 +412,8 @@
     "limitArea": "{count} km² total surface",
     "limitZoneArea": "{count} km² per zone",
     "billingNotice": "Billing is handled by Mollie. Cancel any time — your data is yours to export.",
-    "startTrial": "Start the free trial",
-    "planRunning": "Your trial or subscription is running — surveying is unlocked. Manage or cancel it anytime on the Billing screen.",
+    "subscribe": "Subscribe — €10 today",
+    "planRunning": "Your subscription is running — surveying is unlocked. Manage or cancel it anytime on the Billing screen.",
     "manageSubscription": "Manage the subscription",
     "sectorTitle": "First sector",
     "sectorBody": "Draw a sector on the map. It fills with every business actually registered there — the French national company register knows them, and it is free and key-less. Each one becomes a target carrying two numbers: the loot and the resistance.",
@@ -168,19 +423,20 @@
   "BillingPage": {
     "title": "Billing",
     "backToOnboarding": "Back to onboarding",
+    "backToFit": "Back to the fit check",
     "noticeCheckoutError": "The checkout could not be created. Try again, or come back later.",
     "noticeCancelError": "The cancellation did not go through. Try again, or come back later.",
-    "noticeTermsError": "Confirm the professional-use terms before starting the trial.",
+    "noticeTermsError": "Confirm the professional-use terms before subscribing.",
     "noticeCanceled": "Subscription canceled. Access stays open until the paid period ends.",
     "selfHostedTitle": "Self-hosted instance",
     "selfHostedBody": "Billing is not enabled here: no <code>MOLLIE_API_KEY</code>, no subscription, and no quota — every limit below is off. This screen only does something on the hosted service.",
-    "statusNonePending": "Checkout started but never completed. Start the trial to finish it.",
-    "statusNoneDefault": "No card on file yet. The trial starts the moment one is — nothing is charged today.",
+    "statusNonePending": "Checkout started but never completed. Continue to activate the subscription.",
+    "statusNoneDefault": "No subscription yet. The first month is charged when checkout is completed.",
     "statusTrialCanceledWithDate": "Trial canceled — access stays open until {date}, and nothing will ever be charged.",
     "statusTrialCanceled": "Trial canceled.",
     "statusTrialRunningWithDate": "Trial running — the first payment of {price} goes out on {date}. Cancel before then and nothing is charged.",
     "statusTrialRunning": "Trial running.",
-    "statusExpired": "The trial or subscription has ended. Everything surveyed stays readable; subscribe to keep going.",
+    "statusExpired": "The subscription or a legacy trial has ended. Everything surveyed stays readable; subscribe to keep going.",
     "statusActiveWithDate": "Active — renews on {date}.",
     "statusActive": "Active.",
     "statusCanceledWithDate": "Canceled — access stays open until {date}.",
@@ -189,17 +445,16 @@
     "statusCompleted": "The subscription ran its course. Subscribe again to continue.",
     "testMode": "Test mode: payments go through Mollie’s sandbox, no real card is charged.",
     "perMonth": "/month",
-    "trialNotice": "{days}-day free trial — card required, nothing charged until it ends.",
+    "planNotice": "No free trial — the first month is charged today, then the plan renews monthly.",
     "yourSubscription": "Your subscription",
     "surveyedThisPeriod": "this period",
     "surveyedSoFar": "so far",
     "usageLine": "{usedKm2} of {maxKm2} km² surveyed {period} · {harvestUsed} of {harvestLimit} businesses · {enrichUsed} of {enrichLimit} enrichments · {auditUsed} of {auditLimit} audits",
     "acceptTerms": "I am subscribing for professional use and accept the <link>terms of service</link>.",
-    "startTrial": "Start the {days}-day free trial",
     "subscribe": "Subscribe — €{price}/month",
     "cancelTrial": "Cancel the trial",
     "cancelSubscription": "Cancel the subscription",
-    "cardRequiredNotice": "A card is required to start the trial — €0.00 today, and the first payment only once the trial ends. ",
+    "chargeNotice": "Checkout charges the first month today and creates the mandate for later renewals. ",
     "paymentsNotice": "Payments are handled by Mollie. Cancel any time — access stays open until the end of the paid period and your existing data stays readable."
   },
   "BillingReturn": {
@@ -741,8 +996,8 @@
     "couldNotSave": "Could not save."
   },
   "Quotas": {
-    "startTrial": "Start your free trial on the Billing screen to begin surveying.",
-    "expired": "Your trial or subscription has ended. Subscribe on the Billing screen to keep going — everything already surveyed stays readable.",
+    "subscribe": "Subscribe on the Billing screen to begin surveying.",
+    "expired": "Your subscription or legacy trial has ended. Subscribe on the Billing screen to keep going — everything already surveyed stays readable.",
     "reached": "Quota reached: {used} of {limit} {kind, select, harvest {businesses harvested} enrich {Google enrichments} audit {site audits} area {km² surveyed} other {}} this period. Manage your plan on the Billing screen."
   },
   "PriceGridForm": {
@@ -835,13 +1090,12 @@
     "enrichThisFrame": "Enrich this frame",
     "enrichExplainer": "Google first, then the in-house site audit. Enrichment needs a Google Places key — add one in Settings, or set GOOGLE_PLACES_API_KEY. Google is the only source of a website address, and the audit has nothing to read without one. It advances nobody — it only adds facts.",
     "surveyingLocked": "Surveying locked",
-    "surveyingExpired": "Your trial or subscription has ended. Everything already surveyed stays readable — subscribe to keep going.",
-    "surveyingTrial": "Surveying opens with the free {days}-day trial. A card is required, nothing is charged today, and cancelling before the end costs nothing.",
+    "surveyingExpired": "Your subscription or legacy trial has ended. Everything already surveyed stays readable — subscribe to keep going.",
+    "surveyingSubscribe": "Surveying opens with the Pro subscription. The first month is charged today, then it renews monthly.",
     "subscribe": "Subscribe",
-    "startFreeTrial": "Start the free trial",
     "notNow": "Not now",
     "paymentConfirmed": "Payment confirmed",
-    "paymentConfirmedBody": "Your trial or subscription is running — the map is fully unlocked. Manage or cancel it anytime from the menu, under “Billing and subscription”.",
+    "paymentConfirmedBody": "Your subscription is running — the map is fully unlocked. Manage or cancel it anytime from the menu, under “Billing and subscription”.",
     "gotIt": "Got it",
     "surveyRunning": "Survey running",
     "survey": "Survey",

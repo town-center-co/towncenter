@@ -10,7 +10,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { getCumulativeAreaKm2 } from "@/lib/billing/area";
-import { quotaExpiredMessage, quotaStartTrialMessage } from "@/lib/billing/quotas";
+import { quotaExpiredMessage, quotaSubscribeMessage } from "@/lib/billing/quotas";
 import { getBillingState } from "@/lib/billing/subscriptions";
 import { db, events, targets, zones, type NewTarget, type Zone } from "@/lib/db";
 import { areaKm2, normalizeBbox, pointInPolygon } from "@/lib/geo";
@@ -236,7 +236,7 @@ export async function openZone(
 
   // no mandate yet, or a lapsed one: nothing costly opens, data stays readable.
   if (billing?.state === "none") {
-    return { reason: "billing", message: await quotaStartTrialMessage() };
+    return { reason: "billing", message: await quotaSubscribeMessage() };
   }
   if (billing?.state === "expired") {
     return { reason: "billing", message: await quotaExpiredMessage() };

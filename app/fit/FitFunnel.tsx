@@ -674,6 +674,7 @@ function Paywall({ branch, price, harvestedTargets, enrichments, siteAudits, are
           <p>{t("paywall.cancel")}</p>
         </div>
       </div>
+      <p className={styles.earlyPrice}><BadgeEuro aria-hidden="true" />{t("paywall.earlyPrice", { price })}</p>
       <Button asChild className={styles.paywallCta} variant="primary">
         <Link href={SIGNUP_ROUTE}>{t("paywall.cta", { price })}<ArrowRight aria-hidden="true" /></Link>
       </Button>

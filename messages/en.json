@@ -267,6 +267,7 @@
       "then": "Then",
       "monthly": "€{price}/month",
       "cancel": "Cancel any time. Access remains open until the end of the paid period.",
+      "earlyPrice": "Towncenter is still new, so €{price}/month is an early-user price.",
       "cta": "Create my account — €{price} today",
       "accountNext": "Account creation is the next short step; payment follows securely through Mollie."
     },
